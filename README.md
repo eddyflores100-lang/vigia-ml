@@ -120,6 +120,18 @@ src/
 | `npm run preview` | Sirve el build de producción localmente |
 | `npm run typecheck` | Verificación de tipos TypeScript |
 
+## Despliegue
+
+La app es 100% estática (todo el ML corre en el navegador), así que se despliega gratis en cualquier hosting:
+
+| Plataforma | Cómo | URL resultante |
+|------------|------|----------------|
+| **GitHub Pages** | Ya configurado: el workflow `.github/workflows/deploy.yml` publica en cada push a `main` | [eddyflores100-lang.github.io/vigia-ml](https://eddyflores100-lang.github.io/vigia-ml/) |
+| **Vercel** | Importa el repo en [vercel.com/new](https://vercel.com/new) → framework **Vite** detectado automáticamente (config extra en `vercel.json`) | `vigia-ml.vercel.app` |
+| **Cloudflare Pages** | En [pages.cloudflare.com](https://pages.cloudflare.com) → *Connect to Git* → build `npm run build`, salida `dist` | `vigia-ml.pages.dev` |
+
+> **Supabase** no aloja la app (es backend), pero es el complemento natural cuando quieras persistir telemetría real de campo: la tabla `samples` alimentaría los mismos modelos en lugar del simulador.
+
 ## Detalles técnicos
 
 - **Backend de cómputo**: TensorFlow.js selecciona WebGL automáticamente; si no está disponible cae a CPU y las épocas se reducen para mantener un tiempo de entrenamiento razonable.

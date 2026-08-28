@@ -133,17 +133,26 @@ export default function App() {
   const [mlReady, setMlReady] = useState(false);
 
   const startTraining = () => {
-    engineRef.current?.dispose();
+    engineRef.current?.abort(); // detiene el motor anterior si seguía entrenando
     const eng = new VigiaEngine();
     engineRef.current = eng;
     mlCacheRef.current = new Map();
     mlFcRef.current = null;
     setMlReady(false);
     setMlState(VigiaEngine.initialState());
-    eng.trainAll(setMlState)
-      .then((ok) => setMlReady(ok))
-      .catch(() => setMlReady(false));
+    eng
+      .trainAll((s) => {
+        if (engineRef.current === eng) setMlState(s); // ignora motores obsoletos
+      })
+      .then((ok) => {
+        if (engineRef.current === eng) setMlReady(ok);
+      })
+      .catch(() => {
+        if (engineRef.current === eng) setMlReady(false);
+      });
   };
+
+  const cancelTraining = () => engineRef.current?.abort();
 
   useEffect(() => {
     startTraining();
@@ -157,13 +166,34 @@ export default function App() {
   // ------------------------------ ciclo de 1.5 s ----------------------------
   useEffect(() => {
     let alive = true;
+    let tickCount = 0;
     const step = async () => {
       const wells = fleetRef.current!;
       if (!paused) wells.forEach((w) => w.tick());
-      refreshLevels(wells, true);
 
+      // niveles de flota: si hay caché ML se mantiene (evita parpadeo stats↔ML)
+      const cache = mlCacheRef.current;
+      for (const w of wells) {
+        const r = cache.get(w.id);
+        const a = r
+          ? { score: r.anom.score, level: anomalyLevel(r.anom.score) }
+          : anomaly(w.buf.slice(-240));
+        const prev = w.level;
+        w.score = a.score;
+        w.level = a.level;
+        if (prev !== a.level) {
+          w.log(
+            a.level === "ÓPTIMO" ? "ok" : a.level === "VIGILAR" ? "warn" : "alarm",
+            `${r ? "[ML] " : ""}Índice de anomalía ${a.level === "ÓPTIMO" ? "bajó" : "subió"} a ${a.level} (${a.score})`
+          );
+        }
+      }
+
+      // inferencia ML cada 2 ciclos (3 s): suficiente y sin saturar la GPU
       const eng = engineRef.current;
-      if (eng?.ready) {
+      const infer = tickCount % 2 === 0;
+      tickCount++;
+      if (eng?.ready && infer) {
         try {
           const sel = wells.find((w) => w.id === selId) ?? wells[0];
           const [results, fc] = await Promise.all([
@@ -305,7 +335,7 @@ export default function App() {
 
           <ScenarioControls onInject={inject} active={view.sel.scenario} />
 
-          <TrainingPanel state={mlState} onRetrain={startTraining} />
+          <TrainingPanel state={mlState} onRetrain={startTraining} onCancel={cancelTraining} />
         </section>
 
         {/* inteligencia */}

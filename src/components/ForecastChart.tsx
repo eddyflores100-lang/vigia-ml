@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, memo } from "react";
 import { holtForecast } from "../lib/models";
 import { VAR_META, VAR_KEYS, fmtClock } from "../lib/sim";
 import type { Sample, VarKey } from "../lib/sim";
@@ -22,7 +22,7 @@ interface Hover {
   y: number;
 }
 
-export function ForecastChart({
+export const ForecastChart = memo(function ForecastChart({
   samples,
   varKey,
   onVarKey,
@@ -48,12 +48,20 @@ export function ForecastChart({
   const [hover, setHover] = useState<Hover | null>(null);
   const [ml, setMl] = useState<MlForecast | null>(null);
 
-  // pronóstico LSTM en vivo (rollover asíncrono, no bloquea el render)
+  // pronóstico LSTM en vivo — se recalcula como mucho cada 2.6 s para no
+  // saturar la GPU con rollouts en cada tick de telemetría
+  const lastFcRef = useRef({ t: -1e9, horizon: -1 });
   useEffect(() => {
     if (!engineReady || !engine) {
       setMl(null);
+      lastFcRef.current = { t: -1e9, horizon: -1 };
       return;
     }
+    const now = performance.now();
+    if (now - lastFcRef.current.t < 2600 && lastFcRef.current.horizon === horizon) {
+      return; // el pronóstico actual aún sirve (≤ 2.6 s)
+    }
+    lastFcRef.current = { t: now, horizon };
     let alive = true;
     engine
       .forecastSeries(samples, base, horizon * 4)
@@ -319,4 +327,4 @@ export function ForecastChart({
       </div>
     </div>
   );
-}
+});

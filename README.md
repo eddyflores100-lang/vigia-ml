@@ -31,7 +31,7 @@ La telemetría es **sintética**: un simulador físico de pozos genera series mi
 |------|---------|----------|----------------------|
 | **N1 · Pronóstico** | Proyección multivariada a 6/12/24 h con IC 80% | **LSTM(28)** sobre agregados de 15 min, rollout recursivo de 6 pasos | Holt amortiguado (α=0.32, β=0.11, φ=0.93) |
 | **N2 · Anomalías** | Índice 0–100 por pozo con contribuciones por variable | **Autoencoder denso** 180→72→20→72→180, error de reconstrucción calibrado en validación | z-score multivariable, ventana 120 min |
-| **N3 · Diagnóstico** | Hipótesis de falla con evidencia física | **Clasificador denso** 14→32→16→5 softmax entrenado con ~1.4k ventanas etiquetadas | Reglas físicas v2.4 (23 patrones) |
+| **N3 · Diagnóstico** | Hipótesis de falla con evidencia física | **Clasificador denso** 20→32→16→5 softmax entrenado con ~1.1k ventanas etiquetadas | Reglas físicas v2.4 (23 patrones) |
 | **N4 · Proyección** | P(cruce de umbral en 24 h) + hora estimada | Monte Carlo analítico sobre el pronóstico del LSTM | Ídem sobre Holt |
 | **N5 · Recomendaciones** | Acciones operacionales priorizadas (ALTA/MEDIA/RUTINA) | Derivadas del diagnóstico fusionado ML + reglas | Ídem |
 
@@ -41,11 +41,20 @@ La telemetría es **sintética**: un simulador físico de pozos genera series mi
 
 2. **Autoencoder de anomalías (N2)** — Entrena **solo con operación normal** para reconstruir ventanas de 30 min. En producción, el error de reconstrucción se convierte en score 0–100 mediante la distribución (μ, σ) del error en validación. Las contribuciones por variable revelan *qué señal* está anómala. Un detector de señal congelada complementa al AE (una señal plana es trivial de reconstruir pero es falla clara del transmisor).
 
-3. **Clasificador de diagnóstico (N3)** — Extrae 14 features físicas por ventana de 90 min (tendencias por hora, diferenciales de presión, oscilación de caudal, recorrido del choke, planitud de señal, spikes…) y las pasa por una red softmax de 5 clases. Su salida se **fusiona con las reglas físicas**: la red da la probabilidad, las reglas aportan la evidencia textual que el operador puede auditar.
+3. **Clasificador de diagnóstico (N3)** — Extrae 20 features físicas por ventana de 90 min (tendencias por hora, diferenciales de presión, oscilación de caudal, recorrido del choke, planitud de señal, spikes, desfases de nivel respecto a la línea base y apertura del diferencial casing−tubing) y las pasa por una red softmax de 5 clases. Los desfases de nivel y el diferencial casing−tubing permiten detectar regímenes **ya saturados** (cuando las pendientes vuelven a cero); esas ventanas además se sobremuestrean en el set de entrenamiento. Su salida se **fusiona con las reglas físicas**: la red da la probabilidad, las reglas aportan la evidencia textual que el operador puede auditar.
 
 ### Dataset de entrenamiento
 
-Se generan **62 pozos sintéticos** con bases operativas aleatorias y regímenes inyectados en minute aleatorio. De cada pozo se extraen ~800 ventanas de pronóstico, ~1.0k ventanas normales (autoencoder) y ~1.4k ventanas etiquetadas (clasificador), con split train/validación **por pozo** para evitar fuga de datos y balanceo de la clase normal. Todo determinista (seed fija).
+Se generan **52 pozos sintéticos** con bases operativas aleatorias y regímenes inyectados en un minuto aleatorio de los primeros 60–120. De cada pozo se extraen ~680 ventanas de pronóstico, ~820 ventanas normales (autoencoder) y ~1.1k ventanas etiquetadas (clasificador, con oversampling de las saturadas), con split train/validación **por pozo** para evitar fuga de datos y balanceo de la clase normal. Todo determinista (seed fija).
+
+### Entrenamiento sin bloqueos
+
+El bucle de entrenamiento **nunca congela la pestaña**: en lugar de `model.fit()`, el motor entrena **lote a lote** con `trainOnBatch()` y cede el hilo principal (`tf.nextFrame`) entre lote y lote — puedes seguir explorando la consola mientras entrena, y cancelar con el botón **DETENER** en cualquier momento. Además:
+
+- **Sonda de WebGL**: si el backend declarado no computa, cae automáticamente a CPU.
+- **Modo ligero en CPU**: mitad de dataset y épocas reducidas (~18 s de entrenamiento) frente al modo WebGL completo (~5–10 s).
+- **Presupuesto de tiempo** por fase: si un modelo excede su cupo, termina antes con lo aprendido (sin bloquear la consola).
+- **Inferencia espaciada**: la inferencia en vivo (autoencoder + clasificador + rollout LSTM) corre cada 3 s, no en cada tick de telemetría.
 
 ## Demo rápida
 
@@ -58,10 +67,10 @@ npm run dev          # abre http://localhost:3000
 
 Al abrir la consola verás:
 
-1. **El panel "Motor de aprendizaje"** entrena los 3 modelos en vivo (10–20 s con WebGL; más lento si el navegador cae a CPU). Curva de pérdida, épocas y precisión en tiempo real.
+1. **El panel "Motor de aprendizaje"** entrena los 3 modelos en vivo (~5–10 s con WebGL; ~18 s si tu navegador cae a CPU, sin congelar la interfaz). Curva de pérdida, épocas y precisión en tiempo real — y botón **DETENER** si prefieres saltarlo.
 2. Cada modelo **toma el control de su capa** al terminar (los chips `LSTM · TF.JS` se encienden en N1/N2/N3).
 3. Con el motor listo, la **matriz de confusión** y las métricas de validación quedan visibles; puedes **reentrenar** con un clic.
-4. Selecciona un pozo y **inyecta un régimen** (p. ej. *Liquid loading*): en ~1 minuto el clasificador ML lo detectará con su probabilidad, el autoencoder subirá el índice de anomalía y N5 propondrá acciones.
+4. Selecciona un pozo y **inyecta un régimen** (p. ej. *Liquid loading*): en ~1 minuto el clasificador ML lo detectará con su probabilidad, el autoencoder subirá el índice de anomalía y N5 propondrá acciones. El diagnóstico se mantiene estable incluso cuando el régimen se **satura** (los desfases de nivel siguen señalando la falla).
 
 ![Diagnóstico ML detectando liquid loading](docs/diagnostico-ml.png)
 
@@ -134,7 +143,7 @@ La app es 100% estática (todo el ML corre en el navegador), así que se desplie
 
 ## Detalles técnicos
 
-- **Backend de cómputo**: TensorFlow.js selecciona WebGL automáticamente; si no está disponible cae a CPU y las épocas se reducen para mantener un tiempo de entrenamiento razonable.
+- **Backend de cómputo**: TensorFlow.js selecciona WebGL automáticamente (con sonda de verificación); si no está disponible cae a CPU con dataset y épocas reducidos para mantener un tiempo de entrenamiento razonable.
 - **Memoria**: todos los tensores de inferencia se liberan tras cada ciclo (1.5 s); los modelos viven durante toda la sesión y se liberan al reentrenar o desmontar.
 - **Degradación elegante**: si la inferencia ML falla o el motor aún entrena, cada capa usa su gemelo estadístico — la consola nunca se queda sin análisis.
 - **Reproducibilidad**: el dataset usa semillas fijas; con el mismo navegador obtendrás las mismas curvas de entrenamiento (salvo la no-determinidad propia de WebGL).

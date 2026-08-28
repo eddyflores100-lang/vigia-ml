@@ -2,6 +2,8 @@
 // VIGÍA ML · generación de datasets de entrenamiento a partir del simulador
 // físico de pozos. Cada pozo sintético corre 520 min con un régimen inyectado;
 // de su buffer se extraen ventanas para los tres modelos (N1 / N2 / N3).
+// La generación es ASÍNCRONA y cede el hilo principal entre pozos para no
+// congelar la interfaz durante la carga.
 // ---------------------------------------------------------------------------
 import { WellSim } from "../sim";
 import type { Sample, Scenario, VarKey, WellCfg } from "../sim";
@@ -15,7 +17,7 @@ export const FC_STEPS = 6; // pasos previstos por rollout (1.5 h)
 export const FC_MIN = 15; // resolución del pronóstico (min)
 export const AE_WIN = 30; // ventana del autoencoder (min)
 export const CLS_WIN = 90; // ventana de features del clasificador (min)
-export const N_FEATURES = 14;
+export const N_FEATURES = 20;
 
 export type ClassId = "normal" | "liquidLoading" | "restriction" | "sensorFault" | "controlIssue";
 export const CLASSES: ClassId[] = ["normal", "liquidLoading", "restriction", "sensorFault", "controlIssue"];
@@ -73,8 +75,10 @@ export function normVec(s: Sample, n: Norm): number[] {
 }
 
 // --------------------- features para el clasificador (N3) ------------------
-// 14 rasgos físicos por ventana; todos acotados a [-4, 4] para estabilizar
-// la red densa.
+// 20 rasgos físicos por ventana: tendencias, diferenciales, oscilaciones y
+// DESFASES DE NIVEL respecto a la línea base (clave para detectar regímenes
+// ya saturados, donde las pendientes vuelven a cero). Todos acotados a
+// [-4, 4] para estabilizar la red densa.
 export function extractFeatures(win: Sample[], norm: Norm): number[] {
   const col = (k: VarKey) => win.map((s) => s[k]);
   const slope = (arr: number[]) => linSlopePerHour(arr.map((v, i) => ({ x: i, y: v })));
@@ -110,7 +114,17 @@ export function extractFeatures(win: Sample[], norm: Norm): number[] {
   const pcFirst = mean(win.slice(0, 30).map((s) => s.pc));
   const pcRise = pcFirst > 1 ? mean(tail30.map((s) => s.pc)) / pcFirst - 1 : 0;
 
-  return [ptT, pcT, plT, qT, tT, dpCT, dpTL, qOsc, chokeRange, qResp, ptFlat, ptZ, qDrop, pcRise].map(
+  // desfaces de nivel vs línea base del pozo (detectan regímenes saturados)
+  const off = (k: VarKey) => (mean(tail30.map((s) => s[k])) - norm.base[k]) / norm.scale[k];
+  // apertura del diferencial casing−tubing: firma del liquid loading establecido
+  const gapOff =
+    ((mean(tail30.map((s) => s.pc)) - mean(tail30.map((s) => s.pt))) -
+      (norm.base.pc - norm.base.pt)) / norm.scale.pt;
+  // oscilación de P tubing: el slug del LL saturado la eleva (~±9 psi)
+  const ptOsc = std(tail45.map((s) => s.pt)) / 9;
+
+  return [ptT, pcT, plT, qT, tT, dpCT, dpTL, qOsc, chokeRange, qResp, ptFlat, ptZ, qDrop, pcRise,
+    off("pt"), off("pc"), off("pl"), off("q"), gapOff, ptOsc].map(
     (v) => clamp(v, -4, 4),
   );
 }
@@ -160,14 +174,23 @@ export function aggregates(buf: Sample[], norm: Norm): number[][] {
   return out;
 }
 
-export function generateDataset(seed = 20260828): Dataset {
-  let s = seed >>> 0;
+export interface DatasetOpts {
+  /** semilla determinista del generador */
+  seed?: number;
+  /** 1 = dataset completo (52 pozos) · 0.5 = modo ligero para backend CPU */
+  wellsScale?: number;
+  /** progreso del generador (0..1); puede devolver Promise para ceder el hilo */
+  onProgress?: (frac: number) => void | Promise<void>;
+}
+
+export async function generateDataset(opts: DatasetOpts = {}): Promise<Dataset> {
+  let s = (opts.seed ?? 20260828) >>> 0;
   const nextSeed = () => ((s = (s * 1664525 + 1013904223) >>> 0), s);
 
   const mk = (cls: ClassId, i: number): { cfg: WellCfg; cls: ClassId } => {
     const r = mulberry32(nextSeed());
     const base = randomBase(r);
-    const at = 140 + Math.floor(r() * 90); // minuto de inicio del régimen
+    const at = 60 + Math.floor(r() * 60); // inicio del régimen: deja ventanas saturadas en el buffer
     return {
       cfg: {
         id: `TRN-${CLASS_ABBR[cls]}${i}`,
@@ -183,10 +206,14 @@ export function generateDataset(seed = 20260828): Dataset {
     };
   };
 
+  const scale = clamp(opts.wellsScale ?? 1, 0.35, 1);
+  const nNormal = Math.max(6, Math.round(12 * scale));
+  const nFault = Math.max(4, Math.round(10 * scale));
+
   const plan: { cfg: WellCfg; cls: ClassId }[] = [];
-  for (let i = 0; i < 14; i++) plan.push(mk("normal", i));
+  for (let i = 0; i < nNormal; i++) plan.push(mk("normal", i));
   for (const c of ["liquidLoading", "restriction", "sensorFault", "controlIssue"] as ClassId[]) {
-    for (let i = 0; i < 12; i++) plan.push(mk(c, i));
+    for (let i = 0; i < nFault; i++) plan.push(mk(c, i));
   }
 
   const fcTrainX: number[][][] = [], fcTrainY: number[][] = [];
@@ -205,7 +232,8 @@ export function generateDataset(seed = 20260828): Dataset {
     return a;
   };
 
-  plan.forEach(({ cfg, cls }, wi) => {
+  for (let wi = 0; wi < plan.length; wi++) {
+    const { cfg, cls } = plan[wi];
     const sim = new WellSim(cfg);
     const norm = makeNorm(cfg.base);
     const at = cfg.script[0]?.at ?? 1e9;
@@ -231,6 +259,9 @@ export function generateDataset(seed = 20260828): Dataset {
     }
 
     // --- N3 · ventanas etiquetadas para el clasificador ---
+    // Las ventanas de régimen SATURADO (tendencias ya aplanadas, t≥380) se
+    // duplican: sin eso el clasificador aprende solo la fase de desarrollo
+    // y confunde un régimen establecido con operación normal.
     for (let i = 0; i + CLS_WIN <= buf.length; i += 18) {
       const end = i + CLS_WIN;
       let label: ClassId | null = null;
@@ -239,10 +270,18 @@ export function generateDataset(seed = 20260828): Dataset {
       else if (i >= at + 20) label = cls; // régimen desarrollado
       if (!label) continue; // zona de transición: se descarta
       const f = extractFeatures(buf.slice(i, end), norm);
-      if (isVal) { clsValX.push(f); clsValY.push(CLASSES.indexOf(label)); }
-      else { clsTrainX.push(f); clsTrainY.push(CLASSES.indexOf(label)); }
+      const reps = label !== "normal" && end - at >= 380 ? 2 : 1; // oversampling saturado
+      for (let k = 0; k < reps; k++) {
+        if (isVal) { clsValX.push(f); clsValY.push(CLASSES.indexOf(label)); }
+        else { clsTrainX.push(f); clsTrainY.push(CLASSES.indexOf(label)); }
+      }
     }
-  });
+
+    // ceder el hilo cada 4 pozos: la interfaz respira durante la generación
+    if (wi % 4 === 3 || wi === plan.length - 1) {
+      await opts.onProgress?.((wi + 1) / plan.length);
+    }
+  }
 
   // balanceo: recortar la clase normal si domina demasiado el set de train
   const faultCounts = CLASSES.slice(1).map((c) => clsTrainY.filter((y) => y === CLASSES.indexOf(c)).length);

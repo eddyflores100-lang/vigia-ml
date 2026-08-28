@@ -18,9 +18,11 @@ const PHASE_TEXT: Record<string, string> = {
 export function TrainingPanel({
   state,
   onRetrain,
+  onCancel,
 }: {
   state: TrainState;
   onRetrain: () => void;
+  onCancel?: () => void;
 }) {
   const [open, setOpen] = useState(true);
   const training = state.phase !== "ready" && state.phase !== "error" && state.phase !== "idle";
@@ -44,6 +46,14 @@ export function TrainingPanel({
             >
               TENSORFLOW.JS · {state.backend.toUpperCase()}
             </span>
+            {training && onCancel && (
+              <button
+                onClick={onCancel}
+                className="font-mono text-[8.5px] tracking-[0.1em] px-1.5 py-[2px] border border-line text-fg3 hover:text-crit hover:border-[#f26d5f66] transition-colors"
+              >
+                DETENER
+              </button>
+            )}
             <button
               onClick={() => setOpen((o) => !o)}
               className="font-mono text-[8.5px] tracking-[0.1em] px-1.5 py-[2px] border border-line text-fg3 hover:text-fg2 hover:border-line2 transition-colors"
@@ -121,9 +131,22 @@ export function TrainingPanel({
 
           <p className="mt-2 text-[9.5px] text-fg3 leading-snug">
             Los tres modelos entrenan ahora mismo en tu navegador con telemetría sintética (
-            {state.dataset.wells} pozos). Mientras tanto, el pipeline opera con los modelos
-            estadísticos; cada capa ML toma control al terminar su entrenamiento.
+            {state.dataset.wells} pozos). El bucle cede el control al navegador entre lote y
+            lote, así que la consola sigue respondiendo; el pipeline estadístico cubre cada
+            capa hasta que su modelo ML termina.
           </p>
+        </div>
+      ) : state.phase === "idle" && state.cards.length === 0 ? (
+        <div className="border border-line bg-[#0e1a20] p-2.5 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-[10.5px] text-fg3 leading-snug">{state.label}</p>
+          <button
+            onClick={onRetrain}
+            className="inline-flex items-center gap-1.5 font-mono text-[10px] tracking-[0.1em] px-2.5 py-1.5 border transition-colors hover:bg-[#c9b8f014]"
+            style={{ borderColor: `${ACCENT}66`, color: ACCENT }}
+          >
+            <IconPlay size={11} />
+            ENTRENAR MODELOS
+          </button>
         </div>
       ) : (
         <div>

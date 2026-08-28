@@ -3,7 +3,13 @@
 // N1 LSTM de pronóstico multivariado (rollout recursivo, paso 15 min)
 // N2 Autoencoder denso de detección de anomalías (error de reconstrucción)
 // N3 Clasificador denso softmax de diagnóstico (5 clases operativas)
+//
 // Todo entrena EN EL NAVEGADOR sobre telemetría sintética del simulador.
+// El bucle de entrenamiento trabaja POR LOTES y cede el hilo principal
+// (tf.nextFrame) entre lote y lote: la interfaz nunca se congela aunque el
+// navegador caiga al backend CPU. Incluye sonda de WebGL, presupuesto de
+// tiempo por fase, carga adaptativa (mitad de pozos y épocas en CPU) y
+// cancelación en caliente.
 // ---------------------------------------------------------------------------
 import * as tf from "@tensorflow/tfjs";
 import {
@@ -20,13 +26,14 @@ import {
   makeNorm,
   normVec,
 } from "./dataGen";
-import type { ClassId, Norm } from "./dataGen";
+import type { ClassId } from "./dataGen";
 import { anomalyLevel, linSlopePerHour } from "../models";
 import type { Contribution, Forecast, Hypothesis } from "../models";
 import type { Sample, VarKey } from "../sim";
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 const clamp01 = (v: number) => clamp(v, 0, 1);
+const ABORT_MSG = "__vigia_abort__";
 
 // ------------------------------ estado público ------------------------------
 export type MlPhase =
@@ -98,6 +105,7 @@ const HYP_BY_CLASS: Record<ClassId, { id: string; name: string; icon: Hypothesis
 export class VigiaEngine {
   ready = false;
   backend = "—";
+  private aborted = false;
   private state: TrainState = VigiaEngine.initialState();
 
   private fc: tf.LayersModel | null = null; // N1 LSTM
@@ -139,6 +147,12 @@ export class VigiaEngine {
     this.fc = null;
     this.ae = null;
     this.cls = null;
+  }
+
+  /** Cancela el entrenamiento en curso (el bucle termina en el próximo lote). */
+  abort() {
+    this.aborted = true;
+    this.dispose();
   }
 
   // ------------------------------ arquitecturas -----------------------------
@@ -185,55 +199,163 @@ export class VigiaEngine {
 
   // ------------------------------ entrenamiento -----------------------------
 
-  private async fit(
+  /** Predicción por bloques cediendo el hilo: evita bloqueos con sets grandes. */
+  private async predictRows(
     model: tf.LayersModel,
     x: tf.Tensor,
-    y: tf.Tensor,
-    val: [tf.Tensor, tf.Tensor] | null,
-    epochs: number,
-    batchSize: number,
-    onEpoch: (ep: number, logs: { loss: number; valLoss: number; acc: number }) => void,
-  ) {
-    await model.fit(x, y, {
-      epochs,
-      batchSize,
-      verbose: 0,
-      validationData: val ?? undefined,
-      shuffle: true,
-      callbacks: {
-        onEpochEnd: async (ep: number, logs?: tf.Logs) => {
-          const lg = (logs ?? {}) as Record<string, number | undefined>;
-          onEpoch(ep, {
-            loss: lg.loss ?? 0,
-            valLoss: lg.val_loss ?? 0,
-            acc: lg.acc ?? lg.accuracy ?? 0,
-          });
-          await tf.nextFrame(); // deja respirar a la UI
-        },
-      },
-    });
+    rows: number,
+    chunk = 64,
+  ): Promise<number[]> {
+    const out: number[] = [];
+    for (let i = 0; i < rows; i += chunk) {
+      if (this.aborted) throw new Error(ABORT_MSG);
+      const k = Math.min(chunk, rows - i);
+      const xs = x.slice([i], [k]);
+      const p = model.predict(xs) as tf.Tensor;
+      out.push(...Array.from(await p.data()));
+      xs.dispose();
+      p.dispose();
+      if (i + chunk < rows) await tf.nextFrame();
+    }
+    return out;
+  }
+
+  /**
+   * Bucle de entrenamiento por lotes. A diferencia de model.fit(), aquí se
+   * cede el hilo principal entre lote y lote (tf.nextFrame), así que la
+   * interfaz respira durante TODO el entrenamiento.
+   * Devuelve el nº de épocas completadas (puede ser < epochs por presupuesto).
+   */
+  private async fitLoop(o: {
+    model: tf.LayersModel;
+    n: number;
+    makeBatch: (rows: number[]) => [tf.Tensor, tf.Tensor];
+    valX: tf.Tensor;
+    valY: tf.Tensor;
+    epochs: number;
+    batchSize: number;
+    yieldEvery: number;
+    budgetMs: number;
+    withAcc: boolean;
+    onEpoch: (ep: number, logs: { loss: number; valLoss: number; acc: number }) => void;
+    onBatch?: (frac: number, loss: number) => void;
+  }): Promise<number> {
+    const n = o.n;
+    if (n === 0) return 0;
+    let rs = (0x9e3779b9 ^ (o.epochs * 2654435761)) >>> 0;
+    const rnd = () => {
+      rs = (rs * 1664525 + 1013904223) >>> 0;
+      return rs / 4294967296;
+    };
+    const idx = Array.from({ length: n }, (_, i) => i);
+    const t0 = performance.now();
+    let done = 0;
+    for (let ep = 0; ep < o.epochs; ep++) {
+      if (this.aborted) throw new Error(ABORT_MSG);
+      // barajado determinista por época
+      for (let i = n - 1; i > 0; i--) {
+        const j = Math.floor(rnd() * (i + 1));
+        [idx[i], idx[j]] = [idx[j], idx[i]];
+      }
+      let lossSum = 0;
+      let nb = 0;
+      for (let start = 0; start < n; start += o.batchSize) {
+        if (this.aborted) throw new Error(ABORT_MSG);
+        const rows = idx.slice(start, start + o.batchSize);
+        const [tx, ty] = o.makeBatch(rows);
+        const out = (await o.model.trainOnBatch(tx, ty)) as number | number[];
+        tx.dispose();
+        ty.dispose();
+        const l = Array.isArray(out) ? out[0] : out;
+        lossSum += l;
+        nb++;
+        o.onBatch?.((ep + (start + o.batchSize) / n) / o.epochs, l);
+        if (nb % o.yieldEvery === 0) await tf.nextFrame();
+      }
+      // validación de la época (subconjunto fijo elegido por el llamador)
+      const ev = o.model.evaluate(o.valX, o.valY, { batchSize: 128 }) as tf.Scalar | tf.Scalar[];
+      const sc = Array.isArray(ev) ? ev : [ev];
+      const vals = await Promise.all(sc.map((x) => x.data()));
+      sc.forEach((x) => x.dispose());
+      const valLoss = vals[0] ? (vals[0][0] ?? 0) : 0;
+      const valAcc = o.withAcc && vals.length > 1 && vals[1] ? (vals[1][0] ?? 0) : 0;
+      o.onEpoch(ep, {
+        loss: lossSum / Math.max(1, nb),
+        valLoss,
+        acc: valAcc,
+      });
+      await tf.nextFrame();
+      done = ep + 1;
+      if (performance.now() - t0 > o.budgetMs) break; // presupuesto agotado
+    }
+    return done;
   }
 
   async trainAll(cb: (s: TrainState) => void): Promise<boolean> {
     const t0 = performance.now();
     this.ready = false;
+    this.aborted = false;
     this.dispose();
     const st = VigiaEngine.initialState();
+    let lastSoft = performance.now();
     const emit = (p: Partial<TrainState>) => {
       Object.assign(st, p, { elapsedMs: Math.round(performance.now() - t0) });
       this.state = { ...st };
       cb(this.state);
     };
+    const emitSoft = (p: Partial<TrainState>) => {
+      const now = performance.now();
+      if (now - lastSoft < 160) return; // máx. ~6 actualizaciones/s de progreso
+      lastSoft = now;
+      emit(p);
+    };
 
     try {
-      emit({ phase: "data", label: "Generando telemetría sintética de entrenamiento…", progress: 0.02 });
+      emit({ phase: "data", label: "Inicializando TensorFlow.js…", progress: 0.02 });
       await tf.ready();
-      this.backend = tf.getBackend();
-      emit({ backend: this.backend });
-      await tf.nextFrame();
       await tf.nextFrame();
 
-      const ds = generateDataset();
+      // sonda del backend: si WebGL está declarado pero no computa, caer a CPU
+      if (tf.getBackend() === "webgl") {
+        try {
+          const probe = tf.tidy(() => tf.matMul(tf.ones([96, 96]), tf.ones([96, 96])));
+          await probe.data();
+          probe.dispose();
+        } catch {
+          try {
+            await tf.setBackend("cpu");
+            await tf.ready();
+          } catch {
+            /* se mantiene el backend actual */
+          }
+        }
+      }
+      this.backend = tf.getBackend();
+      const cpu = this.backend !== "webgl";
+      const budgetMs = cpu ? 80_000 : 120_000;
+      const E1 = cpu ? 13 : 22;
+      const E2 = cpu ? 11 : 20;
+      const E3 = cpu ? 17 : 30;
+      const yieldEvery = cpu ? 1 : 2;
+      emit({
+        backend: this.backend,
+        phase: "data",
+        label: `Backend ${this.backend.toUpperCase()} · generando telemetría sintética…`,
+        progress: 0.03,
+      });
+      await tf.nextFrame();
+
+      const ds = await generateDataset({
+        wellsScale: cpu ? 0.7 : 1,
+        onProgress: async (frac) => {
+          emitSoft({
+            phase: "data",
+            label: `Generando telemetría sintética… ${Math.round(frac * 100)}%`,
+            progress: 0.02 + 0.04 * frac,
+          });
+          await tf.nextFrame();
+        },
+      });
       const nFc = ds.fcTrainX.length + ds.fcValX.length;
       const nAe = ds.aeTrainX.length + ds.aeValX.length;
       const nCls = ds.clsTrainX.length + ds.clsValX.length;
@@ -245,34 +367,49 @@ export class VigiaEngine {
       });
       await tf.nextFrame();
 
-      const slowBackend = this.backend === "cpu";
-      const epScale = slowBackend ? 0.4 : 1;
-
       // ------------------------- N1 · LSTM pronóstico -----------------------
-      const E1 = Math.max(8, Math.round(34 * epScale));
-      emit({ phase: "forecast", label: "Entrenando LSTM de pronóstico (N1)…", epochs: E1, epoch: 0 });
+      let tPh = performance.now();
+      emit({ phase: "forecast", label: "Entrenando LSTM de pronóstico (N1)…", epochs: E1, epoch: 0, lossHist: [] });
       this.fc = this.buildForecaster();
-      const fcX = tf.tensor3d(ds.fcTrainX);
-      const fcY = tf.tensor2d(ds.fcTrainY);
-      const fcVX = tf.tensor3d(ds.fcValX);
-      const fcVY = tf.tensor2d(ds.fcValY);
+      const v1 = Math.min(160, ds.fcValX.length);
+      const fcVX = tf.tensor3d(ds.fcValX.slice(0, v1));
+      const fcVY = tf.tensor2d(ds.fcValY.slice(0, v1));
       let fcValLoss = 0;
-      await this.fit(this.fc, fcX, fcY, [fcVX, fcVY], E1, 32, (ep, lg) => {
-        fcValLoss = lg.valLoss || fcValLoss;
-        emit({
-          phase: "forecast",
-          epoch: ep + 1,
-          loss: lg.loss,
-          valLoss: lg.valLoss,
-          lossHist: [...st.lossHist.slice(-79), lg.loss],
-          progress: 0.06 + 0.44 * ((ep + 1) / E1),
-        });
+      const done1 = await this.fitLoop({
+        model: this.fc,
+        n: ds.fcTrainX.length,
+        makeBatch: (rows) => [
+          tf.tensor3d(rows.map((i) => ds.fcTrainX[i])),
+          tf.tensor2d(rows.map((i) => ds.fcTrainY[i])),
+        ],
+        valX: fcVX,
+        valY: fcVY,
+        epochs: E1,
+        batchSize: 32,
+        yieldEvery,
+        budgetMs: budgetMs * 0.5,
+        withAcc: false,
+        onEpoch: (ep, lg) => {
+          fcValLoss = lg.valLoss || fcValLoss;
+          emit({
+            phase: "forecast",
+            epoch: ep + 1,
+            loss: lg.loss,
+            valLoss: lg.valLoss,
+            lossHist: [...st.lossHist.slice(-79), lg.loss],
+            progress: 0.06 + 0.44 * ((ep + 1) / E1),
+          });
+        },
+        onBatch: (frac, l) => emitSoft({ phase: "forecast", loss: l, progress: 0.06 + 0.44 * frac }),
       });
+      fcVX.dispose();
+      fcVY.dispose();
 
       // calibración: σ de residuales por (paso, variable) sobre validación
       {
-        const pred = this.fc.predict(fcVX) as tf.Tensor;
-        const arr = await pred.data();
+        const xAll = tf.tensor3d(ds.fcValX);
+        const arr = await this.predictRows(this.fc, xAll, ds.fcValX.length);
+        xAll.dispose();
         const n = ds.fcValX.length;
         const D = FC_STEPS * ML_VARS.length;
         const stds: number[] = [];
@@ -287,27 +424,25 @@ export class VigiaEngine {
           stds.push(Math.sqrt(Math.max(1e-8, s2 / n - mu * mu)));
         }
         this.fcResid = stds;
-        pred.dispose();
       }
-      fcX.dispose(); fcY.dispose(); fcVX.dispose(); fcVY.dispose();
       emit({
         progress: 0.5,
         cards: [
           ...st.cards,
           {
             name: "LSTM pronóstico",
-            kind: `LSTM(28) → Dense(36) · entrada ${FC_INPUT}×6 · rollout ${FC_STEPS} pasos`,
+            kind: `LSTM(28) → Dense(36) · entrada ${FC_INPUT}×6 · rollout ${FC_STEPS} pasos${done1 < E1 ? " · recortado por presupuesto de tiempo" : ""}`,
             params: this.fc.countParams(),
             valLoss: fcValLoss,
-            epochs: E1,
-            trainMs: Math.round(performance.now() - t0),
+            epochs: done1,
+            trainMs: Math.round(performance.now() - tPh),
           },
         ],
       });
       await tf.nextFrame();
 
       // ---------------------- N2 · Autoencoder anomalías --------------------
-      const E2 = Math.max(8, Math.round(30 * epScale));
+      tPh = performance.now();
       emit({
         phase: "autoencoder",
         label: "Entrenando autoencoder de anomalías (N2)…",
@@ -316,34 +451,53 @@ export class VigiaEngine {
         lossHist: [],
       });
       this.ae = this.buildAutoencoder();
-      const aeX = tf.tensor2d(ds.aeTrainX.map((w) => w.flat()));
-      const aeVX = tf.tensor2d(ds.aeValX.map((w) => w.flat()));
+      const flatRow = (w: number[][]) => w.flat();
+      const v2 = Math.min(160, ds.aeValX.length);
+      const aeVX = tf.tensor2d(ds.aeValX.slice(0, v2).map(flatRow));
       let aeValLoss = 0;
-      await this.fit(this.ae, aeX, aeX, [aeVX, aeVX], E2, 32, (ep, lg) => {
-        aeValLoss = lg.valLoss || aeValLoss;
-        emit({
-          phase: "autoencoder",
-          epoch: ep + 1,
-          loss: lg.loss,
-          valLoss: lg.valLoss,
-          lossHist: [...st.lossHist.slice(-79), lg.loss],
-          progress: 0.5 + 0.22 * ((ep + 1) / E2),
-        });
+      const done2 = await this.fitLoop({
+        model: this.ae,
+        n: ds.aeTrainX.length,
+        makeBatch: (rows) => {
+          const bx = tf.tensor2d(rows.map((i) => flatRow(ds.aeTrainX[i])));
+          return [bx, bx]; // el autoencoder reconstruye su propia entrada
+        },
+        valX: aeVX,
+        valY: aeVX,
+        epochs: E2,
+        batchSize: 32,
+        yieldEvery,
+        budgetMs: budgetMs * 0.25,
+        withAcc: false,
+        onEpoch: (ep, lg) => {
+          aeValLoss = lg.valLoss || aeValLoss;
+          emit({
+            phase: "autoencoder",
+            epoch: ep + 1,
+            loss: lg.loss,
+            valLoss: lg.valLoss,
+            lossHist: [...st.lossHist.slice(-79), lg.loss],
+            progress: 0.5 + 0.22 * ((ep + 1) / E2),
+          });
+        },
+        onBatch: (frac, l) => emitSoft({ phase: "autoencoder", loss: l, progress: 0.5 + 0.22 * frac }),
       });
+      aeVX.dispose();
 
       // calibración del umbral de error sobre operación normal
       {
-        const pred = this.ae.predict(aeVX) as tf.Tensor;
-        const arr = await pred.data();
-        const n = ds.aeValX.length;
+        const flatVal = ds.aeValX.map(flatRow);
+        const xAll = tf.tensor2d(flatVal);
+        const arr = await this.predictRows(this.ae, xAll, flatVal.length);
+        xAll.dispose();
+        const n = flatVal.length;
         const errs: number[] = [];
         const perVar = new Array(ML_VARS.length).fill(0);
-        const flat = ds.aeValX.map((w) => w.flat());
         for (let i = 0; i < n; i++) {
           let e = 0;
           for (let t = 0; t < AE_WIN; t++) {
             for (let k = 0; k < ML_VARS.length; k++) {
-              const d = arr[i * AE_WIN * ML_VARS.length + t * ML_VARS.length + k] - flat[i][t * ML_VARS.length + k];
+              const d = arr[i * AE_WIN * ML_VARS.length + t * ML_VARS.length + k] - flatVal[i][t * ML_VARS.length + k];
               e += (d * d) / (AE_WIN * ML_VARS.length);
               perVar[k] += (d * d) / (AE_WIN * n);
             }
@@ -353,27 +507,25 @@ export class VigiaEngine {
         const mu = errs.reduce((a, b) => a + b, 0) / n;
         const sigma = Math.sqrt(errs.reduce((a, b) => a + (b - mu) ** 2, 0) / n);
         this.aeCal = { mu, sigma: Math.max(1e-9, sigma), perVar: perVar.map((v) => Math.max(1e-9, v)) };
-        pred.dispose();
       }
-      aeX.dispose(); aeVX.dispose();
       emit({
         progress: 0.72,
         cards: [
           ...st.cards,
           {
             name: "Autoencoder N2",
-            kind: `Dense 180→72→20→72→180 · ventana ${AE_WIN} min · σ calibrada en validación`,
+            kind: `Dense 180→72→20→72→180 · ventana ${AE_WIN} min · σ calibrada en validación${done2 < E2 ? " · recortado" : ""}`,
             params: this.ae.countParams(),
             valLoss: aeValLoss,
-            epochs: E2,
-            trainMs: Math.round(performance.now() - t0),
+            epochs: done2,
+            trainMs: Math.round(performance.now() - tPh),
           },
         ],
       });
       await tf.nextFrame();
 
       // --------------------- N3 · Clasificador diagnóstico -------------------
-      const E3 = Math.max(10, Math.round(46 * epScale));
+      tPh = performance.now();
       emit({
         phase: "classifier",
         label: "Entrenando clasificador de diagnóstico (N3)…",
@@ -382,36 +534,53 @@ export class VigiaEngine {
         lossHist: [],
         accHist: [],
       });
-      this.cls = this.buildClassifier(ds.clsTrainX[0]?.length ?? 14);
-      const toOneHot = (ys: number[]) =>
-        ys.map((y) => Array.from({ length: CLASSES.length }, (_, i) => (i === y ? 1 : 0)));
-      const clsX = tf.tensor2d(ds.clsTrainX);
-      const clsY = tf.tensor2d(toOneHot(ds.clsTrainY));
-      const clsVX = tf.tensor2d(ds.clsValX);
-      const clsVY = tf.tensor2d(toOneHot(ds.clsValY));
+      this.cls = this.buildClassifier(ds.clsTrainX[0]?.length ?? 18);
+      const nFeats = ds.clsTrainX[0]?.length ?? 18;
+      const oneHot = (y: number) =>
+        Array.from({ length: CLASSES.length }, (_, i) => (i === y ? 1 : 0));
+      const v3 = Math.min(160, ds.clsValX.length);
+      const clsVX = tf.tensor2d(ds.clsValX.slice(0, v3));
+      const clsVY = tf.tensor2d(ds.clsValY.slice(0, v3).map(oneHot));
       let clsValLoss = 0;
-      let clsAcc = 0;
-      await this.fit(this.cls, clsX, clsY, [clsVX, clsVY], E3, 32, (ep, lg) => {
-        clsValLoss = lg.valLoss || clsValLoss;
-        clsAcc = Math.max(clsAcc, lg.acc);
-        emit({
-          phase: "classifier",
-          epoch: ep + 1,
-          loss: lg.loss,
-          valLoss: lg.valLoss,
-          acc: lg.acc,
-          lossHist: [...st.lossHist.slice(-79), lg.loss],
-          accHist: [...st.accHist.slice(-79), lg.acc],
-          progress: 0.72 + 0.27 * ((ep + 1) / E3),
-        });
+      const done3 = await this.fitLoop({
+        model: this.cls,
+        n: ds.clsTrainX.length,
+        makeBatch: (rows) => [
+          tf.tensor2d(rows.map((i) => ds.clsTrainX[i])),
+          tf.tensor2d(rows.map((i) => oneHot(ds.clsTrainY[i]))),
+        ],
+        valX: clsVX,
+        valY: clsVY,
+        epochs: E3,
+        batchSize: 32,
+        yieldEvery,
+        budgetMs: budgetMs, // todo el tiempo restante del presupuesto global
+        withAcc: true,
+        onEpoch: (ep, lg) => {
+          clsValLoss = lg.valLoss || clsValLoss;
+          emit({
+            phase: "classifier",
+            epoch: ep + 1,
+            loss: lg.loss,
+            valLoss: lg.valLoss,
+            acc: lg.acc,
+            lossHist: [...st.lossHist.slice(-79), lg.loss],
+            accHist: [...st.accHist.slice(-79), lg.acc],
+            progress: 0.72 + 0.27 * ((ep + 1) / E3),
+          });
+        },
+        onBatch: (frac, l) => emitSoft({ phase: "classifier", loss: l, progress: 0.72 + 0.27 * frac }),
       });
+      clsVX.dispose();
+      clsVY.dispose();
 
-      // matriz de confusión sobre validación
+      // matriz de confusión sobre validación completa
       let confusion: number[][] = [];
       let valAcc = 0;
       {
-        const pred = this.cls.predict(clsVX) as tf.Tensor;
-        const arr = await pred.data();
+        const xAll = tf.tensor2d(ds.clsValX);
+        const arr = await this.predictRows(this.cls, xAll, ds.clsValX.length);
+        xAll.dispose();
         confusion = Array.from({ length: CLASSES.length }, () =>
           Array.from({ length: CLASSES.length }, () => 0),
         );
@@ -424,9 +593,7 @@ export class VigiaEngine {
         });
         const total = ds.clsValY.length || 1;
         valAcc = confusion.reduce((a, row, i) => a + row[i], 0) / total;
-        pred.dispose();
       }
-      clsX.dispose(); clsY.dispose(); clsVX.dispose(); clsVY.dispose();
       emit({
         progress: 1,
         confusion,
@@ -434,12 +601,12 @@ export class VigiaEngine {
           ...st.cards,
           {
             name: "Clasificador N3",
-            kind: `Dense 14→32→16→5 softmax · ${(valAcc * 100).toFixed(1)}% acc. validación`,
+            kind: `Dense ${nFeats}→32→16→5 softmax · ${(valAcc * 100).toFixed(1)}% acc. validación${done3 < E3 ? " · recortado" : ""}`,
             params: this.cls.countParams(),
             valLoss: clsValLoss,
             acc: valAcc,
-            epochs: E3,
-            trainMs: Math.round(performance.now() - t0),
+            epochs: done3,
+            trainMs: Math.round(performance.now() - tPh),
           },
         ],
       });
@@ -455,6 +622,18 @@ export class VigiaEngine {
       });
       return true;
     } catch (err) {
+      if (this.aborted || (err instanceof Error && err.message === ABORT_MSG)) {
+        this.dispose();
+        emit({
+          phase: "idle",
+          label: "Entrenamiento cancelado · el pipeline estadístico sigue operativo",
+          progress: 0,
+          epoch: 0,
+          epochs: 0,
+          error: null,
+        });
+        return false;
+      }
       emit({
         phase: "error",
         label: "Error de entrenamiento",
@@ -558,6 +737,7 @@ export class VigiaEngine {
       for (let s = 0; s < FC_STEPS; s++) {
         seq = [...seq, out.slice(s * ML_VARS.length, (s + 1) * ML_VARS.length)];
       }
+      if (b < blocks - 1) await tf.nextFrame(); // ceder el hilo entre bloques
     }
 
     const byVar = {} as MlForecast["byVar"];

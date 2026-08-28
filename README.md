@@ -50,7 +50,7 @@ Se generan **62 pozos sintéticos** con bases operativas aleatorias y regímenes
 ## Demo rápida
 
 ```bash
-git clone https://github.com/TU_USUARIO/vigia-ml.git
+git clone https://github.com/eddyflores100-lang/vigia-ml.git
 cd vigia-ml
 npm install
 npm run dev          # abre http://localhost:3000

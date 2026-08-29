@@ -9,7 +9,7 @@
 [![TensorFlow.js](https://img.shields.io/badge/TensorFlow.js-4.22-ff6f00?logo=tensorflow&logoColor=white)](https://www.tensorflow.org/js)
 [![Vite](https://img.shields.io/badge/Vite-6-646cff?logo=vite&logoColor=white)](https://vitejs.dev)
 [![Tailwind](https://img.shields.io/badge/Tailwind-4-38bdf8?logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
-[![Licencia](https://img.shields.io/badge/Licencia-MIT-3fd0b6.svg)](LICENSE)
+[![Licencia](https://img.shields.io/badge/Licencia-AL--1.0-f28482.svg)](LICENSE-AL-1.0)
 
 *Pronóstico LSTM · Detección de anomalías con autoencoder · Clasificación de fallas con red neuronal — todo entrena y ejecuta **en vivo** en tu navegador, sin servidor.*
 
@@ -159,7 +159,7 @@ La app es 100% estática (todo el ML corre en el navegador), así que se desplie
 
 ## Licencia
 
-[MIT](LICENSE)
+[AliceLabs Source-Available License v1.0 (AL-1.0)](LICENSE-AL-1.0) — el código es inspeccionable y ejecutable libremente para uso no comercial (aprendizaje, investigación académica, auditorías de seguridad). El uso comercial, la redistribución y los forks públicos requieren autorización escrita de AliceLabs LLC: `legal@alicelabs.site`.
 
 ---
 

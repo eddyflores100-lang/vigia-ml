@@ -167,65 +167,73 @@ export default function App() {
   useEffect(() => {
     let alive = true;
     let tickCount = 0;
+    let busy = false; // guardia de reentrancia: si la inferencia tarda más de
+    // un ciclo (p. ej. backend CPU), el próximo tick no la solapa
     const step = async () => {
-      const wells = fleetRef.current!;
-      if (!paused) wells.forEach((w) => w.tick());
+      if (busy) return;
+      busy = true;
+      try {
+        const wells = fleetRef.current!;
+        if (!paused) wells.forEach((w) => w.tick());
 
-      // niveles de flota: si hay caché ML se mantiene (evita parpadeo stats↔ML)
-      const cache = mlCacheRef.current;
-      for (const w of wells) {
-        const r = cache.get(w.id);
-        const a = r
-          ? { score: r.anom.score, level: anomalyLevel(r.anom.score) }
-          : anomaly(w.buf.slice(-240));
-        const prev = w.level;
-        w.score = a.score;
-        w.level = a.level;
-        if (prev !== a.level) {
-          w.log(
-            a.level === "ÓPTIMO" ? "ok" : a.level === "VIGILAR" ? "warn" : "alarm",
-            `${r ? "[ML] " : ""}Índice de anomalía ${a.level === "ÓPTIMO" ? "bajó" : "subió"} a ${a.level} (${a.score})`
-          );
-        }
-      }
-
-      // inferencia ML cada 2 ciclos (3 s): suficiente y sin saturar la GPU
-      const eng = engineRef.current;
-      const infer = tickCount % 2 === 0;
-      tickCount++;
-      if (eng?.ready && infer) {
-        try {
-          const sel = wells.find((w) => w.id === selId) ?? wells[0];
-          const [results, fc] = await Promise.all([
-            Promise.all(
-              wells.map(async (w) => ({ id: w.id, r: await eng.assess(w.buf, w.base) })),
-            ),
-            eng.forecastSeries(sel.buf, sel.base, 96),
-          ]);
-          if (!alive) return;
-          const map = new Map<string, MlWellResult>();
-          for (const { id, r } of results) if (r) map.set(id, r);
-          mlCacheRef.current = map;
-          mlFcRef.current = fc;
-          // el score de flota pasa a medirse con el autoencoder
-          for (const w of wells) {
-            const r = map.get(w.id);
-            if (!r) continue;
-            const prev = w.level;
-            w.score = r.anom.score;
-            w.level = anomalyLevel(r.anom.score);
-            if (prev !== w.level) {
-              w.log(
-                w.level === "ÓPTIMO" ? "ok" : w.level === "VIGILAR" ? "warn" : "alarm",
-                `[ML] Índice de anomalía ${w.level === "ÓPTIMO" ? "bajó" : "subió"} a ${w.level} (${w.score}) · autoencoder`
-              );
-            }
+        // niveles de flota: si hay caché ML se mantiene (evita parpadeo stats↔ML)
+        const cache = mlCacheRef.current;
+        for (const w of wells) {
+          const r = cache.get(w.id);
+          const a = r
+            ? { score: r.anom.score, level: anomalyLevel(r.anom.score) }
+            : anomaly(w.buf.slice(-240));
+          const prev = w.level;
+          w.score = a.score;
+          w.level = a.level;
+          if (prev !== a.level) {
+            w.log(
+              a.level === "ÓPTIMO" ? "ok" : a.level === "VIGILAR" ? "warn" : "alarm",
+              `${r ? "[ML] " : ""}Índice de anomalía ${a.level === "ÓPTIMO" ? "bajó" : "subió"} a ${a.level} (${a.score})`
+            );
           }
-        } catch {
-          /* inferencia fallida → se mantiene el pipeline estadístico */
         }
+
+        // inferencia ML cada 2 ciclos (3 s): suficiente y sin saturar la GPU
+        const eng = engineRef.current;
+        const infer = tickCount % 2 === 0;
+        tickCount++;
+        if (eng?.ready && infer) {
+          try {
+            const sel = wells.find((w) => w.id === selId) ?? wells[0];
+            const [results, fc] = await Promise.all([
+              Promise.all(
+                wells.map(async (w) => ({ id: w.id, r: await eng.assess(w.buf, w.base) })),
+              ),
+              eng.forecastSeries(sel.buf, sel.base, 96),
+            ]);
+            if (!alive) return;
+            const map = new Map<string, MlWellResult>();
+            for (const { id, r } of results) if (r) map.set(id, r);
+            mlCacheRef.current = map;
+            mlFcRef.current = fc;
+            // el score de flota pasa a medirse con el autoencoder
+            for (const w of wells) {
+              const r = map.get(w.id);
+              if (!r) continue;
+              const prev = w.level;
+              w.score = r.anom.score;
+              w.level = anomalyLevel(r.anom.score);
+              if (prev !== w.level) {
+                w.log(
+                  w.level === "ÓPTIMO" ? "ok" : w.level === "VIGILAR" ? "warn" : "alarm",
+                  `[ML] Índice de anomalía ${w.level === "ÓPTIMO" ? "bajó" : "subió"} a ${w.level} (${w.score}) · autoencoder`
+                );
+              }
+            }
+          } catch {
+            /* inferencia fallida → se mantiene el pipeline estadístico */
+          }
+        }
+        if (alive) setTickN((n) => n + 1);
+      } finally {
+        busy = false;
       }
-      if (alive) setTickN((n) => n + 1);
     };
     const id = setInterval(() => void step(), 1500);
     return () => {

@@ -12,6 +12,8 @@
 [![Licencia](https://img.shields.io/badge/Licencia-AL--1.0-f28482.svg)](LICENSE-AL-1.0)
 [![CI](https://github.com/eddyflores100-lang/vigia-ml/actions/workflows/ci.yml/badge.svg)](https://github.com/eddyflores100-lang/vigia-ml/actions/workflows/ci.yml)
 [![Pruebas](https://img.shields.io/badge/pruebas-39%20pasando-3fb950)](#scripts)
+[![Release](https://img.shields.io/github/v/release/eddyflores100-lang/vigia-ml?label=versi%C3%B3n&sort=semver)](https://github.com/eddyflores100-lang/vigia-ml/releases)
+[![Discussions](https://img.shields.io/badge/Discussions-bienvenida-8250df?logo=githubdiscussions)](https://github.com/eddyflores100-lang/vigia-ml/discussions)
 
 *Pronóstico LSTM · Detección de anomalías con autoencoder · Clasificación de fallas con red neuronal — todo entrena y ejecuta **en vivo** en tu navegador, sin servidor.*
 
@@ -137,6 +139,8 @@ src/
 
 ## Qué hay de nuevo en v0.7.0
 
+![Comparativa de flota multi-pozo con diagnósticos LSTM en vivo](docs/comparativa-flota.png)
+
 - **Motor ML en un Web Worker**: el entrenamiento (N1 LSTM + N2 autoencoder + N3 clasificador) y la inferencia ahora corren **fuera del hilo principal** — la interfaz mantiene 60 fps durante el entrenamiento aunque el navegador caiga al backend CPU. Fábrica `createEngine()` con fallback automático al hilo principal en entornos sin module workers. Se corrigió además una fuga sutil: reentrenar terminaba el motor anterior con `abort` pero sin liberar su worker.
 - **Comparativa de flota (multi-pozo)**: nueva tabla `Comparativa de flota` ordenada por criticidad con estado, score de anomalía, caudal actual, tendencia de caudal a 1 h e hipótesis de diagnóstico principal de los 5 pozos — un clic en la fila selecciona el pozo.
 - **Reporte PDF imprimible**: botón **PDF** que abre un reporte operativo A4 (anomalía, diagnóstico con evidencia, proyección N4, recomendaciones N5, calidad de datos y eventos) listo para *Guardar como PDF* desde el diálogo nativo del navegador — sin dependencias añadidas. Si el navegador bloquea la ventana, cae a la descarga JSON.
@@ -178,6 +182,14 @@ La app es 100% estática (todo el ML corre en el navegador), así que se desplie
 - Un modelo supervisado de *falla en X horas* con datos reales requiere históricos de intervenciones documentadas.
 - El rollout recursivo del LSTM acumula deriva a 24 h; las bandas de confianza crecen con √(bloques) para reflejarlo.
 
+## Retroalimentación y comunidad
+
+Este proyecto busca validación de ingenieros de producción, analistas de operaciones y practicantes de ML industrial:
+
+- 💬 **[Discussions](https://github.com/eddyflores100-lang/vigia-ml/discussions)** — preguntas, ideas de nuevas fallas para el simulador, y sobre todo retroalimentación operacional: ¿las hipótesis de diagnóstico y las recomendaciones N5 reflejan lo que verías en campo?
+- 🐛 **[Issues](https://github.com/eddyflores100-lang/vigia-ml/issues)** — bugs o problemas de reproducibilidad.
+- ⭐ Si la consola te resulta útil para enseñar o demostrar analítica de producción, una estrella ayuda a que más gente la encuentre.
+
 ## Licencia
 
 [AliceLabs Source-Available License v1.0 (AL-1.0)](LICENSE-AL-1.0) — el código es inspeccionable y ejecutable libremente para uso no comercial (aprendizaje, investigación académica, auditorías de seguridad). El uso comercial, la redistribución y los forks públicos requieren autorización escrita de AliceLabs LLC: `legal@alicelabs.site`.
@@ -185,5 +197,5 @@ La app es 100% estática (todo el ML corre en el navegador), así que se desplie
 ---
 
 <div align="center">
-<sub>VIGÍA ML v0.5 · Telemetría sintética con fines de demostración · Entrena, vigila, recomienda.</sub>
+<sub>VIGÍA ML v0.7.0 · Telemetría sintética con fines de demostración · Entrena, vigila, recomienda.</sub>
 </div>

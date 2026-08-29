@@ -19,5 +19,7 @@ jobs:
         run: npm ci
       - name: Verificación de tipos
         run: npm run typecheck
+      - name: Pruebas unitarias
+        run: npm test
       - name: Build de producción
         run: npm run build

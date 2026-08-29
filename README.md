@@ -11,7 +11,7 @@
 [![Tailwind](https://img.shields.io/badge/Tailwind-4-38bdf8?logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
 [![Licencia](https://img.shields.io/badge/Licencia-AL--1.0-f28482.svg)](LICENSE-AL-1.0)
 [![CI](https://github.com/eddyflores100-lang/vigia-ml/actions/workflows/ci.yml/badge.svg)](https://github.com/eddyflores100-lang/vigia-ml/actions/workflows/ci.yml)
-[![Pruebas](https://img.shields.io/badge/pruebas-36%20pasando-3fb950)](#scripts)
+[![Pruebas](https://img.shields.io/badge/pruebas-39%20pasando-3fb950)](#scripts)
 
 *Pronóstico LSTM · Detección de anomalías con autoencoder · Clasificación de fallas con red neuronal — todo entrena y ejecuta **en vivo** en tu navegador, sin servidor.*
 
@@ -132,8 +132,16 @@ src/
 | `npm run build` | Build de producción (`dist/`) |
 | `npm run preview` | Sirve el build de producción localmente |
 | `npm run typecheck` | Verificación de tipos TypeScript |
-| `npm test` | Pruebas unitarias (Vitest, 36 tests) |
+| `npm test` | Pruebas unitarias (Vitest, 39 tests) |
 | `npm run test:watch` | Pruebas en modo watch |
+
+## Qué hay de nuevo en v0.7.0
+
+- **Motor ML en un Web Worker**: el entrenamiento (N1 LSTM + N2 autoencoder + N3 clasificador) y la inferencia ahora corren **fuera del hilo principal** — la interfaz mantiene 60 fps durante el entrenamiento aunque el navegador caiga al backend CPU. Fábrica `createEngine()` con fallback automático al hilo principal en entornos sin module workers. Se corrigió además una fuga sutil: reentrenar terminaba el motor anterior con `abort` pero sin liberar su worker.
+- **Comparativa de flota (multi-pozo)**: nueva tabla `Comparativa de flota` ordenada por criticidad con estado, score de anomalía, caudal actual, tendencia de caudal a 1 h e hipótesis de diagnóstico principal de los 5 pozos — un clic en la fila selecciona el pozo.
+- **Reporte PDF imprimible**: botón **PDF** que abre un reporte operativo A4 (anomalía, diagnóstico con evidencia, proyección N4, recomendaciones N5, calidad de datos y eventos) listo para *Guardar como PDF* desde el diálogo nativo del navegador — sin dependencias añadidas. Si el navegador bloquea la ventana, cae a la descarga JSON.
+- **Atajos de teclado**: `1`–`5` selecciona pozo · `P` pausa/reanuda el stream · `C` cicla la variable del gráfico.
+- **A11y**: los botones de exportación exponen `aria-label`.
 
 ## Qué hay de nuevo en v0.6.0
 

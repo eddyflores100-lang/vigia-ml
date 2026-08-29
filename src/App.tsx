@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { SCENARIO_INFO, createFleet, fmtClock, mergeEvents } from "./lib/sim";
+import { SCENARIO_INFO, VAR_KEYS, createFleet, fmtClock, mergeEvents } from "./lib/sim";
 import type { Sample, Scenario, VarKey, WellEvent, WellSim } from "./lib/sim";
 import { anomaly, anomalyLevel, dataQuality, diagnose, projections, recommend } from "./lib/models";
 import type {
@@ -9,9 +9,14 @@ import type {
   ProjRow,
   Recommendation,
 } from "./lib/models";
-import { VigiaEngine, mergeDiagnosis } from "./lib/ml/engine";
-import type { ClassProb, MlAnomaly, MlForecast, TrainState } from "./lib/ml/engine";
-import { buildWellReport, downloadWellCsv, downloadWellReportJson } from "./lib/export";
+import { mergeDiagnosis } from "./lib/ml/engine";
+import { VigiaEngine } from "./lib/ml/engine";
+import type { ClassProb, EngineLike, MlAnomaly, MlForecast, TrainState } from "./lib/ml/engine";
+import { createEngine } from "./lib/ml/engineProxy";
+import { buildWellReport, downloadWellCsv, downloadWellReportJson, printWellReport } from "./lib/export";
+import { fleetCompare } from "./lib/fleet";
+import type { FleetRow } from "./lib/fleet";
+import { ComparePanel } from "./components/ComparePanel";
 import { TopBar } from "./components/TopBar";
 import { WellRail } from "./components/WellRail";
 import type { WellSummary } from "./components/WellRail";
@@ -127,15 +132,20 @@ export default function App() {
   const [tickN, setTickN] = useState(0);
 
   // ------------------------- motor ML (TensorFlow.js) -----------------------
-  const engineRef = useRef<VigiaEngine | null>(null);
+  // corre en un Web Worker (EngineProxy); fallback automático al hilo
+  // principal (VigiaEngine) en entornos sin soporte de module workers
+  const engineRef = useRef<EngineLike | null>(null);
   const mlCacheRef = useRef<Map<string, MlWellResult>>(new Map());
   const mlFcRef = useRef<MlForecast | null>(null);
   const [mlState, setMlState] = useState<TrainState>(VigiaEngine.initialState());
   const [mlReady, setMlReady] = useState(false);
 
   const startTraining = () => {
-    engineRef.current?.abort(); // detiene el motor anterior si seguía entrenando
-    const eng = new VigiaEngine();
+    // motor anterior: abort + dispose (el proxy termina el worker viejo:
+    // solo abort dejaría el hilo del worker vivo = fuga de memoria)
+    engineRef.current?.abort();
+    engineRef.current?.dispose();
+    const eng = createEngine();
     engineRef.current = eng;
     mlCacheRef.current = new Map();
     mlFcRef.current = null;
@@ -248,6 +258,12 @@ export default function App() {
     [tickN, selId],
   );
 
+  // comparativa de flota: se recalcula con el mismo ritmo que la vista
+  const fleetRows = useMemo<FleetRow[]>(
+    () => fleetCompare(fleetRef.current!),
+    [tickN],
+  );
+
   const topDiagId = view.diag[0]?.id ?? "";
   useEffect(() => {
     setDoneRecs(new Set());
@@ -285,6 +301,39 @@ export default function App() {
     });
     downloadWellReportJson(report);
   };
+
+  const exportPdf = () => {
+    printWellReport(buildWellReport({
+      well: { id: view.sel.id, name: view.sel.name, field: view.sel.field, depth: view.sel.depth },
+      samples: view.samples,
+      anom: view.anom,
+      anomMl: view.anomMl,
+      diag: view.diag,
+      proj: view.proj,
+      recs: view.recs,
+      dq: view.dq,
+      events: view.events,
+    }));
+  };
+
+  // atajos de teclado: 1..5 selecciona pozo · P pausa · C cicla variable
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+      const wells = fleetRef.current!;
+      const n = Number(e.key);
+      if (!Number.isNaN(n) && n >= 1 && n <= wells.length) {
+        setSelId(wells[n - 1].id);
+      } else if (e.key === "p" || e.key === "P") {
+        setPaused((p) => !p);
+      } else if (e.key === "c" || e.key === "C") {
+        setVarKey((k) => VAR_KEYS[(VAR_KEYS.indexOf(k) + 1) % VAR_KEYS.length]);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   const toggleRec = (id: string) => {
     setDoneRecs((prev) => {
@@ -342,14 +391,24 @@ export default function App() {
               <span className="flex items-center gap-1.5">
                 <button
                   onClick={exportCsv}
+                  aria-label="Descargar telemetría completa del pozo en CSV"
                   title="Descargar telemetría completa del pozo en CSV"
                   className="px-2 py-1 rounded border border-line text-fg2 hover:border-ok/60 hover:text-ok transition-colors"
                 >
                   CSV
                 </button>
                 <button
+                  onClick={exportPdf}
+                  aria-label="Generar reporte operativo imprimible (PDF)"
+                  title="Generar reporte operativo imprimible (PDF)"
+                  className="px-2 py-1 rounded border border-line text-fg2 hover:border-ok/60 hover:text-ok transition-colors"
+                >
+                  PDF
+                </button>
+                <button
                   onClick={exportReport}
-                  title="Descargar reporte operativo completo (JSON)"
+                  aria-label="Descargar reporte operativo completo en JSON"
+                  title="Descargar reporte operativo completo en JSON"
                   className="px-2 py-1 rounded border border-line text-fg2 hover:border-ok/60 hover:text-ok transition-colors"
                 >
                   JSON
@@ -359,6 +418,8 @@ export default function App() {
           </div>
 
           <KpiGrid samples={view.samples} />
+
+          <ComparePanel rows={fleetRows} selId={view.sel.id} onSelect={setSelId} />
 
           <ForecastChart
             samples={view.samples}
@@ -398,7 +459,8 @@ export default function App() {
             FALLBACK ESTADÍSTICO (HOLT / Z-SCORE / REGLAS v2.4)
           </span>
           <span className="hidden md:inline">PIPELINE N1→N5 COMPLETO</span>
-          <span className="ml-auto">TELEMETRÍA SINTÉTICA CON FINES DE DEMOSTRACIÓN · VIGÍA ML v0.6 · 2026</span>
+          <span className="hidden lg:inline">ATAJOS: 1–5 POZO · P PAUSA · C VARIABLE</span>
+          <span className="ml-auto">TELEMETRÍA SINTÉTICA CON FINES DE DEMOSTRACIÓN · VIGÍA ML v0.7 · 2026</span>
         </div>
       </footer>
     </div>

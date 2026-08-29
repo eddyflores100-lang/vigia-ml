@@ -830,3 +830,25 @@ export function mergeDiagnosis(rules: Hypothesis[], probs: ClassProb[], win: Sam
 }
 
 export type { Forecast };
+
+// ---------------------------------------------------------------------------
+// Interfaz estructural del motor: la implementación de referencia es
+// VigiaEngine (hilo principal) y EngineProxy (Web Worker). El resto de la
+// app solo depende de esta forma, nunca de la clase concreta.
+// ---------------------------------------------------------------------------
+export interface EngineLike {
+  ready: boolean;
+  backend: string;
+  trainAll(cb: (s: TrainState) => void): Promise<boolean>;
+  abort(): void;
+  dispose(): void;
+  assess(
+    samples: Sample[],
+    base: Record<VarKey, number>,
+  ): Promise<{ anom: MlAnomaly; probs: ClassProb[] } | null>;
+  forecastSeries(
+    samples: Sample[],
+    base: Record<VarKey, number>,
+    steps: number,
+  ): Promise<MlForecast | null>;
+}

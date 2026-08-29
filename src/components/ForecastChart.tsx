@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, memo } from "react";
 import { holtForecast } from "../lib/models";
 import { VAR_META, VAR_KEYS, fmtClock } from "../lib/sim";
 import type { Sample, VarKey } from "../lib/sim";
-import type { VigiaEngine, MlForecast } from "../lib/ml/engine";
+import type { EngineLike, MlForecast } from "../lib/ml/engine";
 import { EngineChip, SectionHead } from "./bits";
 
 const VB_W = 880;
@@ -40,7 +40,7 @@ export const ForecastChart = memo(function ForecastChart({
   onHorizon: (h: number) => void;
   thrLow?: number;
   base: Record<VarKey, number>;
-  engine: VigiaEngine | null;
+  engine: EngineLike | null;
   engineReady: boolean;
 }) {
   const meta = VAR_META[varKey];

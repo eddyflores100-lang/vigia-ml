@@ -11,6 +11,7 @@ import type {
 } from "./lib/models";
 import { VigiaEngine, mergeDiagnosis } from "./lib/ml/engine";
 import type { ClassProb, MlAnomaly, MlForecast, TrainState } from "./lib/ml/engine";
+import { buildWellReport, downloadWellCsv, downloadWellReportJson } from "./lib/export";
 import { TopBar } from "./components/TopBar";
 import { WellRail } from "./components/WellRail";
 import type { WellSummary } from "./components/WellRail";
@@ -266,6 +267,25 @@ export default function App() {
     setTickN((n) => n + 1);
   };
 
+  const exportCsv = () => {
+    downloadWellCsv(view.sel.id, fleetRef.current!.find((w) => w.id === view.sel.id)?.buf ?? view.samples);
+  };
+
+  const exportReport = () => {
+    const report = buildWellReport({
+      well: { id: view.sel.id, name: view.sel.name, field: view.sel.field, depth: view.sel.depth },
+      samples: view.samples,
+      anom: view.anom,
+      anomMl: view.anomMl,
+      diag: view.diag,
+      proj: view.proj,
+      recs: view.recs,
+      dq: view.dq,
+      events: view.events,
+    });
+    downloadWellReportJson(report);
+  };
+
   const toggleRec = (id: string) => {
     setDoneRecs((prev) => {
       const next = new Set(prev);
@@ -319,6 +339,22 @@ export default function App() {
                 <span className={`w-1.5 h-1.5 rounded-full ${paused ? "bg-watch" : "bg-ok live-dot"}`} />
                 STREAM 1 MIN
               </span>
+              <span className="flex items-center gap-1.5">
+                <button
+                  onClick={exportCsv}
+                  title="Descargar telemetría completa del pozo en CSV"
+                  className="px-2 py-1 rounded border border-line text-fg2 hover:border-ok/60 hover:text-ok transition-colors"
+                >
+                  CSV
+                </button>
+                <button
+                  onClick={exportReport}
+                  title="Descargar reporte operativo completo (JSON)"
+                  className="px-2 py-1 rounded border border-line text-fg2 hover:border-ok/60 hover:text-ok transition-colors"
+                >
+                  JSON
+                </button>
+              </span>
             </div>
           </div>
 
@@ -362,7 +398,7 @@ export default function App() {
             FALLBACK ESTADÍSTICO (HOLT / Z-SCORE / REGLAS v2.4)
           </span>
           <span className="hidden md:inline">PIPELINE N1→N5 COMPLETO</span>
-          <span className="ml-auto">TELEMETRÍA SINTÉTICA CON FINES DE DEMOSTRACIÓN · VIGÍA ML v0.5 · 2026</span>
+          <span className="ml-auto">TELEMETRÍA SINTÉTICA CON FINES DE DEMOSTRACIÓN · VIGÍA ML v0.6 · 2026</span>
         </div>
       </footer>
     </div>

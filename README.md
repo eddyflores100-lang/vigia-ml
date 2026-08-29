@@ -10,6 +10,8 @@
 [![Vite](https://img.shields.io/badge/Vite-6-646cff?logo=vite&logoColor=white)](https://vitejs.dev)
 [![Tailwind](https://img.shields.io/badge/Tailwind-4-38bdf8?logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
 [![Licencia](https://img.shields.io/badge/Licencia-AL--1.0-f28482.svg)](LICENSE-AL-1.0)
+[![CI](https://github.com/eddyflores100-lang/vigia-ml/actions/workflows/ci.yml/badge.svg)](https://github.com/eddyflores100-lang/vigia-ml/actions/workflows/ci.yml)
+[![Pruebas](https://img.shields.io/badge/pruebas-36%20pasando-3fb950)](#scripts)
 
 *Pronóstico LSTM · Detección de anomalías con autoencoder · Clasificación de fallas con red neuronal — todo entrena y ejecuta **en vivo** en tu navegador, sin servidor.*
 
@@ -130,6 +132,17 @@ src/
 | `npm run build` | Build de producción (`dist/`) |
 | `npm run preview` | Sirve el build de producción localmente |
 | `npm run typecheck` | Verificación de tipos TypeScript |
+| `npm test` | Pruebas unitarias (Vitest, 36 tests) |
+| `npm run test:watch` | Pruebas en modo watch |
+
+## Qué hay de nuevo en v0.6.0
+
+- **Suite de pruebas unitarias (Vitest)**: 36 tests cubren el simulador (determinismo, escenarios, límites del buffer), la capa analítica N1–N5 (Holt amortiguado, Φ normal, proyecciones, anomalías, diagnóstico, recomendaciones, calidad de datos) y el generador de datasets ML (formas, determinismo, sin fuga de datos por pozo). El CI ejecuta typecheck + tests + build en cada push.
+- **Fallback N3 reforzado**: nueva rama de **liquid loading establecido** — cuando el régimen ya está saturado y las tendencias se aplanan, el diagnóstico estadístico ahora detecta la oscilación tipo slug persistente (σ de caudal > 3 % + oscilación de P·tubing > 4 psi), replicando las señales que usa el clasificador ML (`ptOsc`/`gapOff`).
+- **Guardia de saneamiento de datos**: toda muestra pasa por `sanitizeSample()` en el único punto de entrada al buffer — NaN/Infinity se sustituyen por valores finitos dentro de rangos físicos, protegiendo al pipeline estadístico y a los modelos TF.js de datos corruptos.
+- **ErrorBoundary de React**: un fallo de render degrada a un panel de contingencia con botón de recuperación en vez de dejar la consola en blanco.
+- **PWA instalable y offline**: manifest + service worker (stale-while-revalidate para assets, network-first para navegaciones, fuentes cacheadas). Instálala desde el navegador y ábrela sin conexión.
+- **Exportación de datos**: botones **CSV** (telemetría completa, BOM UTF-8 compatible con Excel) y **JSON** (reporte operativo: anomalía, diagnóstico, proyección N4, recomendaciones N5, calidad de datos y eventos) en la cabecera del pozo.
 
 ## Despliegue
 

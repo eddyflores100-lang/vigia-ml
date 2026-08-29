@@ -139,7 +139,7 @@ export interface Dataset {
   // autoencoder: ventanas 1-min de operación NORMAL [30][6]
   aeTrainX: number[][][];
   aeValX: number[][][];
-  // clasificador: features [14] + etiqueta de clase
+  // clasificador: features [20] + etiqueta de clase
   clsTrainX: number[][];
   clsTrainY: number[];
   clsValX: number[][];

@@ -13,6 +13,8 @@
 
 *Pronóstico LSTM · Detección de anomalías con autoencoder · Clasificación de fallas con red neuronal — todo entrena y ejecuta **en vivo** en tu navegador, sin servidor.*
 
+> ▶️ **Demo en vivo: [eddyflores100-lang.github.io/vigia-ml/](https://eddyflores100-lang.github.io/vigia-ml/)** — sin instalación: abre el enlace y los modelos se entrenan en tu navegador.
+
 </div>
 
 ---

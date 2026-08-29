@@ -45,6 +45,25 @@ export const VAR_META: Record<
 
 export const VAR_KEYS: VarKey[] = ["pt", "pc", "pl", "temp", "q", "choke"];
 
+// ------------------------- guardia de saneamiento --------------------------
+// Toda muestra entra al buffer por un único punto (WellSim.step) y pasa por
+// aquí: si un cálculo futuro produce NaN/Infinity (p. ej. un divisor inespe-
+// rado en un régimen nuevo), el pipeline estadístico y los modelos ML siguen
+// recibiendo valores finitos y coherentes con el rango físico del pozo.
+const SAN_LO: Record<VarKey, number> = { pt: 0, pc: 0, pl: 0, temp: -20, q: 0, choke: 0 };
+const SAN_HI: Record<VarKey, number> = { pt: 15000, pc: 15000, pl: 15000, temp: 200, q: 60000, choke: 100 };
+
+export function sanitizeSample(s: Sample): Sample {
+  const out = { ...s };
+  for (const k of VAR_KEYS) {
+    if (!Number.isFinite(out[k])) out[k] = k === "temp" ? 0 : SAN_LO[k];
+    if (out[k] < SAN_LO[k]) out[k] = SAN_LO[k];
+    if (out[k] > SAN_HI[k]) out[k] = SAN_HI[k];
+  }
+  if (!Number.isFinite(out.m)) out.m = 0;
+  return out;
+}
+
 // el minuto 0 equivale a ~6.7 h atrás en tiempo real
 export const SIM_EPOCH = Date.now() - 400 * 60000;
 
@@ -220,7 +239,7 @@ export class WellSim {
     }
 
     q = Math.max(0, q);
-    this.buf.push({ m, pt, pc, pl, temp, q, choke: clamp(this.choke, 2, 100) });
+    this.buf.push(sanitizeSample({ m, pt, pc, pl, temp, q, choke: clamp(this.choke, 2, 100) }));
     if (this.buf.length > 520) this.buf.shift();
     this.phaseT++;
   }

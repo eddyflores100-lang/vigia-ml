@@ -285,6 +285,31 @@ export function diagnose(samples: Sample[]): Hypothesis[] {
     });
   }
 
+  // LL establecido (saturado): las tendencias ya se aplanaron, pero la
+  // oscilación tipo slug en caudal y la oscilación de P tubing persisten.
+  // Sin esta rama el fallback estadístico solo detecta LL en fase de
+  // desarrollo y un régimen establecido pasa por "normal" (el clasificador
+  // ML lo cubre vía gapOff/ptOsc; aquí se replica con señales en ventana).
+  const ptTail = samples.slice(-45).map((s) => s.pt);
+  const ptM45 = ptTail.reduce((a, b) => a + b, 0) / ptTail.length;
+  const ptOsc = Math.sqrt(
+    ptTail.reduce((a, b) => a + (b - ptM45) ** 2, 0) / ptTail.length,
+  );
+  const qOscRel = qMean > 1 ? qSd / qMean : 0;
+  if (!out.some((h) => h.id === "liquid-loading") && qOscRel > 0.03 && ptOsc > 4) {
+    out.push({
+      id: "liquid-loading",
+      name: "Liquid loading establecido en tubing",
+      icon: "droplet",
+      conf: clamp01(0.5 + (ptOsc - 4) / 25),
+      evidence: [
+        `Oscilación tipo slug persistente: caudal σ rel ${(100 * qOscRel).toFixed(1)}% con tendencias planas`,
+        `P tubing oscila σ≈${ptOsc.toFixed(1)} psi en los últimos 45 min`,
+        "Régimen saturado: el gas no logra desaguar el tubing pese a la estabilidad aparente",
+      ],
+    });
+  }
+
   const rs = clamp01((dpTL / 8) * 0.4 + (-plS / 12) * 0.3 + (-qS / 240) * 0.3);
   if (rs > 0.34) {
     out.push({

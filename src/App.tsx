@@ -11,6 +11,9 @@ import type {
   ProjRow,
   Recommendation,
 } from "./lib/models";
+import { explainSamples } from "./lib/explain";
+import type { ExplainResult } from "./lib/explain";
+import type { CopilotContext } from "./lib/copilot";
 import { mergeDiagnosis } from "./lib/ml/engine";
 import { VigiaEngine } from "./lib/ml/engine";
 import type { ClassProb, EngineLike, MlAnomaly, MlForecast, TrainState } from "./lib/ml/engine";
@@ -22,6 +25,8 @@ import { ComparePanel } from "./components/ComparePanel";
 import { ArpsCard } from "./components/ArpsCard";
 import { RulCard } from "./components/RulCard";
 import { VirtualMeterCard } from "./components/VirtualMeterCard";
+import { ExplainCard } from "./components/ExplainCard";
+import { CopilotPanel } from "./components/CopilotPanel";
 import { SourcePanel } from "./components/SourcePanel";
 import { TopBar } from "./components/TopBar";
 import { WellRail } from "./components/WellRail";
@@ -44,6 +49,7 @@ interface View {
   proj: ProjRow[];
   recs: Recommendation[];
   dq: DataQuality;
+  explain: ExplainResult;
   events: WellEvent[];
   alarmCount: number;
   observing: number;
@@ -103,6 +109,7 @@ function buildView(
   const proj = projections(samples, sel.base, mlFc);
   const recs = recommend(diag, proj, samples);
   const dq = dataQuality(sel.buf.slice(-260));
+  const explain = explainSamples(samples, { score: anom.score, level: anom.level });
   const events = mergeEvents(wells, 42);
   const alarmCount = wells.filter((w) => w.level === "ALERTA" || w.level === "CRÍTICO").length;
   const observing = wells.filter((w) => w.level !== "ÓPTIMO").length;
@@ -117,6 +124,7 @@ function buildView(
     proj,
     recs,
     dq,
+    explain,
     events,
     alarmCount,
     observing,
@@ -423,6 +431,25 @@ export default function App() {
     });
   };
 
+  // contexto del copiloto: la misma vista que consume la UI, reconstruida con
+  // el mismo ritmo del tick — el chat siempre responde sobre el estado vivo
+  const copilotCtx = useMemo<CopilotContext>(
+    () => ({
+      well: { id: view.sel.id, name: view.sel.name, field: view.sel.field, depth: view.sel.depth },
+      samples: view.samples,
+      base: view.sel.base,
+      anom: { score: view.anom.score, level: view.anom.level, contributions: view.anom.contributions, ml: view.anomMl },
+      diag: view.diag,
+      diagMl: view.diagMl,
+      proj: view.proj,
+      recs: view.recs,
+      dq: view.dq,
+      events: view.events,
+      fleet: view.summaries.map((s) => ({ id: s.id, name: s.name, level: s.status, score: s.score, qNow: s.qNow })),
+    }),
+    [view],
+  );
+
   return (
     <div className="relative z-10 min-h-screen flex flex-col font-body">
       <TopBar
@@ -524,6 +551,8 @@ export default function App() {
             <DataQualityPanel dq={view.dq} />
           </div>
 
+          <ExplainCard ex={view.explain} />
+
           <ScenarioControls onInject={inject} active={view.sel.scenario} />
 
           <SourcePanel
@@ -541,6 +570,7 @@ export default function App() {
 
         {/* inteligencia */}
         <aside className="col-span-12 xl:col-span-3 flex flex-col gap-3 min-w-0">
+          <CopilotPanel ctx={copilotCtx} />
           <DiagnosisPanel diag={view.diag} ml={view.diagMl} />
           <ProjectionPanel proj={view.proj} />
           <RecommendationsPanel recs={view.recs} done={doneRecs} onToggle={toggleRec} />
@@ -554,9 +584,9 @@ export default function App() {
             MODELOS EN NAVEGADOR · TENSORFLOW.JS · LSTM N1 + AUTOENCODER N2 + CLASIFICADOR N3 ·
             FALLBACK ESTADÍSTICO (HOLT / Z-SCORE / REGLAS v2.4)
           </span>
-          <span className="hidden md:inline">DCA ARPS · RUL WEIBULL · MEDICIÓN VIRTUAL</span>
+          <span className="hidden md:inline">DCA ARPS · RUL WEIBULL · MEDICIÓN VIRTUAL · COPILOTO NL · EXPLICABILIDAD</span>
           <span className="hidden lg:inline">ATAJOS: 1–5 POZO · P PAUSA · C VARIABLE</span>
-          <span className="ml-auto">TELEMETRÍA SINTÉTICA CON FINES DE DEMOSTRACIÓN · VIGÍA ML v0.9 · 2026</span>
+          <span className="ml-auto">TELEMETRÍA SINTÉTICA CON FINES DE DEMOSTRACIÓN · VIGÍA ML v0.10 · 2026</span>
         </div>
       </footer>
     </div>

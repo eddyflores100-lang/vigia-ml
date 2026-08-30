@@ -11,7 +11,7 @@
 [![Tailwind](https://img.shields.io/badge/Tailwind-4-38bdf8?logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
 [![Licencia](https://img.shields.io/badge/Licencia-AL--1.0-f28482.svg)](LICENSE-AL-1.0)
 [![CI](https://github.com/eddyflores100-lang/vigia-ml/actions/workflows/ci.yml/badge.svg)](https://github.com/eddyflores100-lang/vigia-ml/actions/workflows/ci.yml)
-[![Pruebas](https://img.shields.io/badge/pruebas-81%20pasando-3fb950)](#scripts)
+[![Pruebas](https://img.shields.io/badge/pruebas-111%20pasando-3fb950)](#scripts)
 [![Release](https://img.shields.io/github/v/release/eddyflores100-lang/vigia-ml?label=versi%C3%B3n&sort=semver)](https://github.com/eddyflores100-lang/vigia-ml/releases)
 [![Discussions](https://img.shields.io/badge/Discussions-bienvenida-8250df?logo=githubdiscussions)](https://github.com/eddyflores100-lang/vigia-ml/discussions)
 
@@ -134,8 +134,14 @@ src/
 | `npm run build` | Build de producción (`dist/`) |
 | `npm run preview` | Sirve el build de producción localmente |
 | `npm run typecheck` | Verificación de tipos TypeScript |
-| `npm test` | Pruebas unitarias (Vitest, 81 tests) |
+| `npm test` | Pruebas unitarias (Vitest, 111 tests) |
 | `npm run test:watch` | Pruebas en modo watch |
+
+## Qué hay de nuevo en v0.10.0
+
+- **Copiloto «pregúntale al pozo»**: panel de consulta en lenguaje natural sobre el estado del pozo, diagnósticos y evidencias, tendencias, eventos, RUL, EUR y medición virtual — el diferenciador de demos del roadmap comercial (#2). El motor (`copilot.ts`) es **100 % determinista y offline**: normaliza la consulta (insensible a acentos/mayúsculas), la clasifica en 15 intenciones con coincidencia por palabra completa y compone la respuesta desde las salidas reales del pipeline (N1–N5, Weibull, Arps, Bean, calidad de datos, eventos, flota). Sin red, sin API externa, sin modelo generativo: la misma pregunta da la misma respuesta y **los datos nunca salen del navegador** — coherente con la promesa de privacidad del producto. Incluye **reporte narrativo de 8 secciones** (estado → diagnóstico → explicabilidad → riesgo 24 h → vida útil → declinación → medición virtual → acciones) listo para leer en el handover del turno. La interfaz deja un historial de 6 turnos con chips de sugerencia.
+- **Explicabilidad de predicciones** (roadmap #7): nueva tarjeta **EXPLAIN** que descompone el índice de anomalía en aportes por variable — responde «¿el modelo mira P·tubing porque…?» con barras de aporte normalizadas (misma ponderación que N2, normalizada a 100 %), dirección de movimiento (sube/baja/plano), tendencia por hora y frases en lenguaje operativo («PT-101 en 512 psi (−8,4 % vs base), cayendo −14,2 psi/h — aporta 42 % del índice»). Las señales congeladas se denuncian como probable falla de instrumento, no del pozo. El copiloto reutiliza esta descomposición en el intent «anomalía».
+- **Pruebas**: +30 tests (copiloto: normalización, 15 intents sobre la flota demo, tolerancia a acentos, sinónimos EN, determinismo byte a byte, fallback; explicabilidad: suma de aportes 100 %, ordenamiento, dominancia de caída de PT, señales planas, choke excluido como setpoint, serie insuficiente, ventana configurable) — **111 en total**.
 
 ## Qué hay de nuevo en v0.9.0
 
@@ -222,5 +228,5 @@ Este proyecto busca validación de ingenieros de producción, analistas de opera
 ---
 
 <div align="center">
-<sub>VIGÍA ML v0.9.0 · Telemetría sintética con fines de demostración · Entrena, vigila, recomienda.</sub>
+<sub>VIGÍA ML v0.10.0 · Telemetría sintética con fines de demostración · Entrena, vigila, pregunta.</sub>
 </div>

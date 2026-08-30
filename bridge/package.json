@@ -1,0 +1,20 @@
+{
+  "name": "vigia-opcua-bridge",
+  "private": true,
+  "version": "0.8.0",
+  "description": "Puente OPC-UA → WebSocket para vigia-ml: reenvía lecturas del servidor de automatización a la consola en el navegador.",
+  "type": "module",
+  "license": "SEE LICENSE IN ../LICENSE-AL-1.0",
+  "main": "opcua-bridge.mjs",
+  "scripts": {
+    "start": "node opcua-bridge.mjs",
+    "start:demo": "VIGIA_DEMO=1 node opcua-bridge.mjs"
+  },
+  "dependencies": {
+    "ws": "^8.18.0",
+    "node-opcua": "^2.145.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

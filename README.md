@@ -11,7 +11,7 @@
 [![Tailwind](https://img.shields.io/badge/Tailwind-4-38bdf8?logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
 [![Licencia](https://img.shields.io/badge/Licencia-AL--1.0-f28482.svg)](LICENSE-AL-1.0)
 [![CI](https://github.com/eddyflores100-lang/vigia-ml/actions/workflows/ci.yml/badge.svg)](https://github.com/eddyflores100-lang/vigia-ml/actions/workflows/ci.yml)
-[![Pruebas](https://img.shields.io/badge/pruebas-39%20pasando-3fb950)](#scripts)
+[![Pruebas](https://img.shields.io/badge/pruebas-59%20pasando-3fb950)](#scripts)
 [![Release](https://img.shields.io/github/v/release/eddyflores100-lang/vigia-ml?label=versi%C3%B3n&sort=semver)](https://github.com/eddyflores100-lang/vigia-ml/releases)
 [![Discussions](https://img.shields.io/badge/Discussions-bienvenida-8250df?logo=githubdiscussions)](https://github.com/eddyflores100-lang/vigia-ml/discussions)
 
@@ -134,8 +134,27 @@ src/
 | `npm run build` | Build de producción (`dist/`) |
 | `npm run preview` | Sirve el build de producción localmente |
 | `npm run typecheck` | Verificación de tipos TypeScript |
-| `npm test` | Pruebas unitarias (Vitest, 39 tests) |
+| `npm test` | Pruebas unitarias (Vitest, 59 tests) |
 | `npm run test:watch` | Pruebas en modo watch |
+
+## Qué hay de nuevo en v0.8.0
+
+- **Análisis de declinación Arps (DCA)**: nueva tarjeta con ajuste de curvas de declinación (exponencial / hiperbólica / armónica) sobre el histórico de producción diaria del pozo — `qi`, `Di` efectiva mensual, exponente `b`, **EUR a abandono y a 5 años**, R² y curva de ajuste + pronóstico a 6 meses. El ajuste usa linealización sobre malla de b + mínimos cuadrados y exige explicar más varianza que la media (series planas se rechazan, no se inventa declinación). El histórico demo es determinista por pozo con una declinación "verdadera" embebida (`wellHistory.ts`): puedes comparar el ajuste contra la verdad conocida. Cuando el puente OPC-UA aporta series reales, la misma tarjeta las consume sin cambios de código.
+- **Conector OPC-UA vía puente WebSocket**: la ingesta industrial llega con `src/lib/ingest/` + `bridge/opcua-bridge.mjs` — un puente Node.js de referencia que habla OPC-UA binario con tu SCADA/RTU y reenvía frames JSON a la consola por WebSocket. El cliente (`OpcuaBridgeSource`) trae reconexión con backoff exponencial, vigilancia de latidos (enlace zombi → corte y reintento), mapa de nodos configurable y contadores recibidas/aceptadas/rechazadas. Nueva tarjeta **Fuente de datos** para conectar/desconectar desde la UI; las muestras entran por `sanitizeSample()` al buffer del pozo seleccionado.
+- **Pruebas**: +20 tests (DCA: recuperación de parámetros en las tres formas de Arps, EUR contra forma cerrada, series planas; ingesta: suscripción, mapeo de nodos, descarte de valores no finitos, reconexión con backoff, latidos) — 59 en total.
+
+### Integración OPC-UA en 2 pasos
+
+```bash
+# 1. Instala y levanta el puente en la máquina con acceso al SCADA
+cd bridge && npm install
+npm run start:demo          # puente demo sin SCADA (solo necesita `ws`)
+
+# 2. En la consola: Fuente de datos → PUENTE OPC-UA
+#    URL ws://localhost:8082 → Conectar
+```
+
+Para un servidor real: `node opcua-bridge.mjs --endpoint "opc.tcp://user:pass@10.0.0.5:4840" --map mapa.json`. Documentación completa, formato de `mapa.json` y notas de seguridad (wss, red de operaciones, credenciales de solo lectura) en **[bridge/README.md](bridge/README.md)**.
 
 ## Qué hay de nuevo en v0.7.0
 
@@ -197,5 +216,5 @@ Este proyecto busca validación de ingenieros de producción, analistas de opera
 ---
 
 <div align="center">
-<sub>VIGÍA ML v0.7.0 · Telemetría sintética con fines de demostración · Entrena, vigila, recomienda.</sub>
+<sub>VIGÍA ML v0.8.0 · Telemetría sintética con fines de demostración · Entrena, vigila, recomienda.</sub>
 </div>

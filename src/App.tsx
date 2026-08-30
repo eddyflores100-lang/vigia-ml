@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { SCENARIO_INFO, VAR_KEYS, createFleet, fmtClock, mergeEvents } from "./lib/sim";
+import { SCENARIO_INFO, VAR_KEYS, VAR_META, createFleet, fmtClock, mergeEvents, sanitizeSample } from "./lib/sim";
 import type { Sample, Scenario, VarKey, WellEvent, WellSim } from "./lib/sim";
+import { OpcuaBridgeSource } from "./lib/ingest/opcuaBridge";
+import type { LinkStatus, LinkStats, TagMap } from "./lib/ingest/opcuaBridge";
 import { anomaly, anomalyLevel, dataQuality, diagnose, projections, recommend } from "./lib/models";
 import type {
   AnomalyResult,
@@ -17,6 +19,8 @@ import { buildWellReport, downloadWellCsv, downloadWellReportJson, printWellRepo
 import { fleetCompare } from "./lib/fleet";
 import type { FleetRow } from "./lib/fleet";
 import { ComparePanel } from "./components/ComparePanel";
+import { ArpsCard } from "./components/ArpsCard";
+import { SourcePanel } from "./components/SourcePanel";
 import { TopBar } from "./components/TopBar";
 import { WellRail } from "./components/WellRail";
 import type { WellSummary } from "./components/WellRail";
@@ -277,6 +281,79 @@ export default function App() {
     return undefined;
   }, [view.sel, varKey]);
 
+  // ------------------------ fuente externa (puente OPC-UA) ------------------
+  // las muestras del puente entran saneadas al buffer del pozo seleccionado;
+  // el simulador queda en pausa mientras la fuente externa está activa
+  const sourceRef = useRef<OpcuaBridgeSource | null>(null);
+  const selIdRef = useRef(selId);
+  selIdRef.current = selId;
+  const [srcUrl, setSrcUrl] = useState("ws://localhost:8082");
+  const [srcStatus, setSrcStatus] = useState<LinkStatus>("idle");
+  const [srcStats, setSrcStats] = useState<LinkStats>({ received: 0, accepted: 0, rejected: 0, reconnects: 0 });
+  const [srcInfo, setSrcInfo] = useState("");
+
+  const connectSource = () => {
+    disconnectSource();
+    const src = new OpcuaBridgeSource();
+    src.onData((s) => {
+      const wells = fleetRef.current!;
+      const w = wells.find((x) => x.id === selIdRef.current) ?? wells[0];
+      const last = w.last;
+      const v = s.values;
+      // variables ausentes en el frame se mantienen del último valor (continuidad)
+      w.buf.push(
+        sanitizeSample({
+          m: last.m + 1,
+          pt: v.pt ?? last.pt,
+          pc: v.pc ?? last.pc,
+          pl: v.pl ?? last.pl,
+          temp: v.temp ?? last.temp,
+          q: v.q ?? last.q,
+          choke: v.choke ?? last.choke,
+        }),
+      );
+      if (w.buf.length > 520) w.buf.shift();
+      setSrcStats(src.stats);
+    });
+    src.onStatus((st, info) => {
+      setSrcStatus(st);
+      setSrcInfo(info);
+      setSrcStats(src.stats);
+    });
+    // mapa por defecto: los tags de demostración del propio consola
+    const tags: TagMap = {
+      pt: VAR_META.pt.tag,
+      pc: VAR_META.pc.tag,
+      pl: VAR_META.pl.tag,
+      temp: VAR_META.temp.tag,
+      q: VAR_META.q.tag,
+      choke: VAR_META.choke.tag,
+    };
+    src.connect(srcUrl, tags);
+    sourceRef.current = src;
+    setPaused(true);
+    const sel = fleetRef.current!.find((x) => x.id === selIdRef.current) ?? fleetRef.current![0];
+    sel.log("info", `Fuente externa conectada: ${srcUrl} (simulador en pausa)`);
+    refreshLevels(fleetRef.current!, true);
+  };
+
+  const disconnectSource = () => {
+    if (sourceRef.current) {
+      sourceRef.current.disconnect();
+      sourceRef.current = null;
+    }
+    setSrcStatus("idle");
+    setSrcInfo("");
+    setSrcStats({ received: 0, accepted: 0, rejected: 0, reconnects: 0 });
+  };
+
+  useEffect(() => {
+    return () => {
+      sourceRef.current?.disconnect();
+      sourceRef.current = null;
+    };
+  }, []);
+
   const inject = (s: Scenario) => {
     view.sel.setScenario(s);
     refreshLevels(fleetRef.current!, true);
@@ -433,12 +510,24 @@ export default function App() {
             engineReady={mlReady}
           />
 
+          <ArpsCard wellId={view.sel.id} baseQ={view.sel.base.q} />
+
           <div className="flex flex-wrap gap-3">
             <AnomalyPanel result={view.anom} ml={view.anomMl} />
             <DataQualityPanel dq={view.dq} />
           </div>
 
           <ScenarioControls onInject={inject} active={view.sel.scenario} />
+
+          <SourcePanel
+            status={srcStatus}
+            stats={srcStats}
+            info={srcInfo}
+            url={srcUrl}
+            onUrl={setSrcUrl}
+            onConnect={connectSource}
+            onDisconnect={disconnectSource}
+          />
 
           <TrainingPanel state={mlState} onRetrain={startTraining} onCancel={cancelTraining} />
         </section>
@@ -460,7 +549,7 @@ export default function App() {
           </span>
           <span className="hidden md:inline">PIPELINE N1→N5 COMPLETO</span>
           <span className="hidden lg:inline">ATAJOS: 1–5 POZO · P PAUSA · C VARIABLE</span>
-          <span className="ml-auto">TELEMETRÍA SINTÉTICA CON FINES DE DEMOSTRACIÓN · VIGÍA ML v0.7 · 2026</span>
+          <span className="ml-auto">TELEMETRÍA SINTÉTICA CON FINES DE DEMOSTRACIÓN · VIGÍA ML v0.8 · 2026</span>
         </div>
       </footer>
     </div>

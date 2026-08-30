@@ -20,6 +20,8 @@ import { fleetCompare } from "./lib/fleet";
 import type { FleetRow } from "./lib/fleet";
 import { ComparePanel } from "./components/ComparePanel";
 import { ArpsCard } from "./components/ArpsCard";
+import { RulCard } from "./components/RulCard";
+import { VirtualMeterCard } from "./components/VirtualMeterCard";
 import { SourcePanel } from "./components/SourcePanel";
 import { TopBar } from "./components/TopBar";
 import { WellRail } from "./components/WellRail";
@@ -513,6 +515,11 @@ export default function App() {
           <ArpsCard wellId={view.sel.id} baseQ={view.sel.base.q} />
 
           <div className="flex flex-wrap gap-3">
+            <RulCard diag={view.diag} samples={view.samples} base={view.sel.base} anomScore={view.anom.score} />
+            <VirtualMeterCard samples={view.samples} base={view.sel.base} />
+          </div>
+
+          <div className="flex flex-wrap gap-3">
             <AnomalyPanel result={view.anom} ml={view.anomMl} />
             <DataQualityPanel dq={view.dq} />
           </div>
@@ -547,9 +554,9 @@ export default function App() {
             MODELOS EN NAVEGADOR · TENSORFLOW.JS · LSTM N1 + AUTOENCODER N2 + CLASIFICADOR N3 ·
             FALLBACK ESTADÍSTICO (HOLT / Z-SCORE / REGLAS v2.4)
           </span>
-          <span className="hidden md:inline">PIPELINE N1→N5 COMPLETO</span>
+          <span className="hidden md:inline">DCA ARPS · RUL WEIBULL · MEDICIÓN VIRTUAL</span>
           <span className="hidden lg:inline">ATAJOS: 1–5 POZO · P PAUSA · C VARIABLE</span>
-          <span className="ml-auto">TELEMETRÍA SINTÉTICA CON FINES DE DEMOSTRACIÓN · VIGÍA ML v0.8 · 2026</span>
+          <span className="ml-auto">TELEMETRÍA SINTÉTICA CON FINES DE DEMOSTRACIÓN · VIGÍA ML v0.9 · 2026</span>
         </div>
       </footer>
     </div>

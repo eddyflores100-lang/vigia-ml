@@ -11,7 +11,7 @@
 [![Tailwind](https://img.shields.io/badge/Tailwind-4-38bdf8?logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
 [![Licencia](https://img.shields.io/badge/Licencia-AL--1.0-f28482.svg)](LICENSE-AL-1.0)
 [![CI](https://github.com/eddyflores100-lang/vigia-ml/actions/workflows/ci.yml/badge.svg)](https://github.com/eddyflores100-lang/vigia-ml/actions/workflows/ci.yml)
-[![Pruebas](https://img.shields.io/badge/pruebas-59%20pasando-3fb950)](#scripts)
+[![Pruebas](https://img.shields.io/badge/pruebas-81%20pasando-3fb950)](#scripts)
 [![Release](https://img.shields.io/github/v/release/eddyflores100-lang/vigia-ml?label=versi%C3%B3n&sort=semver)](https://github.com/eddyflores100-lang/vigia-ml/releases)
 [![Discussions](https://img.shields.io/badge/Discussions-bienvenida-8250df?logo=githubdiscussions)](https://github.com/eddyflores100-lang/vigia-ml/discussions)
 
@@ -134,8 +134,14 @@ src/
 | `npm run build` | Build de producción (`dist/`) |
 | `npm run preview` | Sirve el build de producción localmente |
 | `npm run typecheck` | Verificación de tipos TypeScript |
-| `npm test` | Pruebas unitarias (Vitest, 59 tests) |
+| `npm test` | Pruebas unitarias (Vitest, 81 tests) |
 | `npm run test:watch` | Pruebas en modo watch |
+
+## Qué hay de nuevo en v0.9.0
+
+- **Medición virtual por choke (soft-sensor)**: la consola ya no depende solo del medidor fiscal. La fórmula de Bean (crítico) + factor subcrítico parabólico (`virtualMeter.ts`) estima el caudal desde `P·tubing`, `P·línea`, temperatura, apertura del choke y gravedad del gas. El `Cd` del pozo se **calibra contra el medidor** (`calibrateCd`) y el contraste continuo (`meterCheck`) marca divergencias sostenidas > 5 %: si FT-301 decae o queda cubierto por hidratos, la tarjeta **MV** lo señala y la estimación puede usarse de respaldo mientras se re-calibra el instrumento. Casos de uso: pozos sin medidor permanente, validación cruzada y detección de medidores degradados.
+- **Vida útil restante (RUL) con Weibull + AFT**: nueva tarjeta que responde "¿falla en ~X horas?" — modelo de supervivencia `S(t) = exp(−(t/η)^β)` con priors por modo de falla (carga de líquidos, restricción, actuador, instrumentación) y **aceleración por covariables** (`η_ef = η0·exp(−Σ wᵢ·xᵢ)`): score de anomalía N2, confianza del diagnóstico N3 y caída de caudal. La edad del episodio se estima del buffer (minutos bajo umbral / congelado) y los cuantiles son **condicionales** dado sobrevivir a la edad actual: la tarjeta muestra mediana, rango p10–p90, supervivencia actual y curva S(t) con marcador del "ahora".
+- **Pruebas**: +22 tests (física del choke: monotonicidades, cuadrado del diámetro, régimen crítico/subcrítico, calibración reproducible, rechazo de entradas no físicas; Weibull: identidad del cuantil condicional `S(t+x_p) = S(t)·(1−p)`, hazard creciente, aceleración monótona, edad de episodio, determinismo) — **81 en total**.
 
 ## Qué hay de nuevo en v0.8.0
 
@@ -216,5 +222,5 @@ Este proyecto busca validación de ingenieros de producción, analistas de opera
 ---
 
 <div align="center">
-<sub>VIGÍA ML v0.8.0 · Telemetría sintética con fines de demostración · Entrena, vigila, recomienda.</sub>
+<sub>VIGÍA ML v0.9.0 · Telemetría sintética con fines de demostración · Entrena, vigila, recomienda.</sub>
 </div>

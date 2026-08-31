@@ -263,8 +263,10 @@ export class WellSim {
       q = q * (1 - 0.18 * s);
     } else if (this.scenario === "sanding") {
       // arena: ráfagas de alta frecuencia en caudal con choke estable + jitter
-      // de P·línea (impactos contra la trampa/restricciones locales)
-      const s = Math.min(1, t / 240);
+      // de P·línea (impactos contra la trampa/restricciones locales).
+      // Rampa corta (45 min): la arena aparece por cambios de drawdown, no es
+      // un proceso lento — el demo la muestra en ~100 s de reloj real.
+      const s = Math.min(1, t / 45);
       q = q + Math.sin(t / 1.8) * b.q * 0.022 * s + (r() < 0.1 ? (r() < 0.5 ? -1 : 1) * b.q * 0.07 * s : 0);
       pl += Math.sin(t / 2.4) * 7 * s + n(2 * s);
       pt += Math.sin(t / 3.1) * 5 * s;

@@ -10,14 +10,14 @@
 [![Vite](https://img.shields.io/badge/Vite-6-646cff?logo=vite&logoColor=white)](https://vitejs.dev)
 [![Tailwind](https://img.shields.io/badge/Tailwind-4-38bdf8?logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
 [![Licencia](https://img.shields.io/badge/Licencia-AL--1.0-f28482.svg)](LICENSE-AL-1.0)
-[![CI](https://github.com/eddyflores100-lang/vigia-ml/actions/workflows/ci.yml/badge.svg)](https://github.com/eddyflores100-lang/vigia-ml/actions/workflows/ci.yml)
+[![CI](https://github.com/alicelabs-llc/vigia-ml/actions/workflows/ci.yml/badge.svg)](https://github.com/alicelabs-llc/vigia-ml/actions/workflows/ci.yml)
 [![Pruebas](https://img.shields.io/badge/pruebas-140%20pasando-3fb950)](#scripts)
-[![Release](https://img.shields.io/github/v/release/eddyflores100-lang/vigia-ml?label=versi%C3%B3n&sort=semver)](https://github.com/eddyflores100-lang/vigia-ml/releases)
-[![Discussions](https://img.shields.io/badge/Discussions-bienvenida-8250df?logo=githubdiscussions)](https://github.com/eddyflores100-lang/vigia-ml/discussions)
+[![Release](https://img.shields.io/github/v/release/eddyflores100-lang/vigia-ml?label=versi%C3%B3n&sort=semver)](https://github.com/alicelabs-llc/vigia-ml/releases)
+[![Discussions](https://img.shields.io/badge/Discussions-bienvenida-8250df?logo=githubdiscussions)](https://github.com/alicelabs-llc/vigia-ml/discussions)
 
 *Pronóstico LSTM · Detección de anomalías con autoencoder · Clasificación de fallas con red neuronal — todo entrena y ejecuta **en vivo** en tu navegador, sin servidor.*
 
-> ▶️ **Demo en vivo: [eddyflores100-lang.github.io/vigia-ml/](https://eddyflores100-lang.github.io/vigia-ml/)** — sin instalación: abre el enlace y los modelos se entrenan en tu navegador.
+> ▶️ **Demo en vivo: [alicelabs-llc.github.io/vigia-ml/](https://alicelabs-llc.github.io/vigia-ml/)** — sin instalación: abre el enlace y los modelos se entrenan en tu navegador.
 
 </div>
 
@@ -65,7 +65,7 @@ El bucle de entrenamiento **nunca congela la pestaña**: en lugar de `model.fit(
 ## Demo rápida
 
 ```bash
-git clone https://github.com/eddyflores100-lang/vigia-ml.git
+git clone https://github.com/alicelabs-llc/vigia-ml.git
 cd vigia-ml
 npm install
 npm run dev          # abre http://localhost:3000
@@ -201,7 +201,7 @@ La app es 100% estática (todo el ML corre en el navegador), así que se desplie
 
 | Plataforma | Cómo | URL resultante |
 |------------|------|----------------|
-| **GitHub Pages** | Ya configurado: el workflow `.github/workflows/deploy.yml` publica en cada push a `main` | [eddyflores100-lang.github.io/vigia-ml](https://eddyflores100-lang.github.io/vigia-ml/) |
+| **GitHub Pages** | Ya configurado: el workflow `.github/workflows/deploy.yml` publica en cada push a `main` | [alicelabs-llc.github.io/vigia-ml](https://alicelabs-llc.github.io/vigia-ml/) |
 | **Vercel** | Importa el repo en [vercel.com/new](https://vercel.com/new) → framework **Vite** detectado automáticamente (config extra en `vercel.json`) | `vigia-ml.vercel.app` |
 | **Cloudflare Pages** | En [pages.cloudflare.com](https://pages.cloudflare.com) → *Connect to Git* → build `npm run build`, salida `dist` | `vigia-ml.pages.dev` |
 
@@ -225,8 +225,8 @@ La app es 100% estática (todo el ML corre en el navegador), así que se desplie
 
 Este proyecto busca validación de ingenieros de producción, analistas de operaciones y practicantes de ML industrial:
 
-- 💬 **[Discussions](https://github.com/eddyflores100-lang/vigia-ml/discussions)** — preguntas, ideas de nuevas fallas para el simulador, y sobre todo retroalimentación operacional: ¿las hipótesis de diagnóstico y las recomendaciones N5 reflejan lo que verías en campo?
-- 🐛 **[Issues](https://github.com/eddyflores100-lang/vigia-ml/issues)** — bugs o problemas de reproducibilidad.
+- 💬 **[Discussions](https://github.com/alicelabs-llc/vigia-ml/discussions)** — preguntas, ideas de nuevas fallas para el simulador, y sobre todo retroalimentación operacional: ¿las hipótesis de diagnóstico y las recomendaciones N5 reflejan lo que verías en campo?
+- 🐛 **[Issues](https://github.com/alicelabs-llc/vigia-ml/issues)** — bugs o problemas de reproducibilidad.
 - ⭐ Si la consola te resulta útil para enseñar o demostrar analítica de producción, una estrella ayuda a que más gente la encuentre.
 
 ## Licencia

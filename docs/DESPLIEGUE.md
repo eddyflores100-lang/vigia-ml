@@ -2,7 +2,7 @@
 
 VIGÍA ML es una aplicación **100 % estática**: todo el cómputo (incluido el entrenamiento de los 3 modelos de TensorFlow.js) ocurre en el navegador del visitante. No hay backend, base de datos ni funciones serverless, así que puede alojarse gratis en cualquier hosting de sitios estáticos. Esta guía describe cómo migrar o replicar el despliegue actual de GitHub Pages en **Vercel** o **Cloudflare Pages**, manteniendo ambos activos si lo deseas (no son excluyentes: cada plataforma sirve el mismo `dist/` desde su propia URL).
 
-> **Estado actual**: GitHub Pages publica automáticamente en cada push a `main` mediante `.github/workflows/deploy.yml` → https://eddyflores100-lang.github.io/vigia-ml/
+> **Estado actual**: GitHub Pages publica automáticamente en cada push a `main` mediante `.github/workflows/deploy.yml` → https://alicelabs-llc.github.io/vigia-ml/
 
 ## Por qué la migración es trivial
 
@@ -17,7 +17,7 @@ VIGÍA ML es una aplicación **100 % estática**: todo el cómputo (incluido el 
 
 1. Entra a [vercel.com/new](https://vercel.com/new) con tu cuenta (GitHub, Google o email).
 2. Conecta tu cuenta de GitHub si es la primera vez y autoriza el acceso a tus repositorios.
-3. Selecciona el repositorio **`eddyflores100-lang/vigia-ml`** y pulsa **Import**.
+3. Selecciona el repositorio **`alicelabs-llc/vigia-ml`** y pulsa **Import**.
 4. Vercel detecta automáticamente el framework (**Vite**) y lee `vercel.json`:
    - Build Command: `npm run build`
    - Output Directory: `dist`

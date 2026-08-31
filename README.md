@@ -1,3 +1,5 @@
+> ⚠️ **PROYECTO MIGRADO** → continúa en **[alicelabs-llc/vigia-ml](https://github.com/alicelabs-llc/vigia-ml)** · Demo: https://alicelabs-llc.github.io/vigia-ml/
+
 <div align="center">
 
 # VIGÍA ML

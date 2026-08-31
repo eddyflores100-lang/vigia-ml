@@ -9,7 +9,11 @@ export type Scenario =
   | "liquidLoading"
   | "restriction"
   | "sensorFault"
-  | "controlIssue";
+  | "controlIssue"
+  | "casingLeak"
+  | "tubingLeak"
+  | "hydrates"
+  | "sanding";
 
 export type Severity = "info" | "ok" | "warn" | "alarm";
 
@@ -107,6 +111,10 @@ export const SCENARIO_INFO: Record<Scenario, { label: string; sev: Severity; msg
   restriction:  { label: "Restricción",     sev: "warn",  msg: "Régimen inyectado: restricción en línea (demo)" },
   sensorFault:  { label: "Falla de sensor", sev: "alarm", msg: "Falla de sensor inyectada en PT-101 (demo)" },
   controlIssue: { label: "Problema de control", sev: "warn", msg: "Régimen inyectado: actuador de choke sin respuesta (demo)" },
+  casingLeak:   { label: "Fuga en anular",  sev: "warn",  msg: "Régimen inyectado: fuga de presión en anular (demo)" },
+  tubingLeak:   { label: "Fuga en tubing",  sev: "alarm", msg: "Régimen inyectado: fuga en tubing (demo)" },
+  hydrates:     { label: "Hidratos",        sev: "warn",  msg: "Régimen inyectado: formación de hidratos (demo)" },
+  sanding:      { label: "Arena",           sev: "warn",  msg: "Régimen inyectado: impactos de arena (demo)" },
 };
 
 let evtSeq = 1;
@@ -233,6 +241,33 @@ export class WellSim {
       pt += 13 * s;
       temp += 2.5 * s;
       q = q * (1 - 0.2 * s);
+    } else if (this.scenario === "casingLeak") {
+      // fuga en el anular: P·casing cae sostenida, el resto casi no reacciona
+      const s = Math.min(1, t / 360);
+      pc -= 58 * s;
+      q = q * (1 - 0.06 * s);
+    } else if (this.scenario === "tubingLeak") {
+      // fuga en tubing: pt y pc caen juntas (comunicación), el caudal cae;
+      // a diferencia del liquid loading, aquí pc NO sube
+      const s = Math.min(1, t / 300);
+      pt -= 62 * s;
+      pc -= 44 * s;
+      temp -= 3 * s;
+      q = q * (1 - 0.24 * s);
+    } else if (this.scenario === "hydrates") {
+      // hidratos: caída térmica + restricción aguas abajo + pérdida de caudal
+      const s = Math.min(1, t / 330);
+      temp -= 7 * s;
+      pl -= 50 * s;
+      pt += 11 * s;
+      q = q * (1 - 0.18 * s);
+    } else if (this.scenario === "sanding") {
+      // arena: ráfagas de alta frecuencia en caudal con choke estable + jitter
+      // de P·línea (impactos contra la trampa/restricciones locales)
+      const s = Math.min(1, t / 240);
+      q = q + Math.sin(t / 1.8) * b.q * 0.022 * s + (r() < 0.1 ? (r() < 0.5 ? -1 : 1) * b.q * 0.07 * s : 0);
+      pl += Math.sin(t / 2.4) * 7 * s + n(2 * s);
+      pt += Math.sin(t / 3.1) * 5 * s;
     } else if (this.scenario === "sensorFault") {
       pt = (this.frozen ?? b.pt) + n(0.02);
       if (r() < 0.012) pt = (this.frozen ?? b.pt) + 220 * (r() < 0.5 ? -1 : 1);

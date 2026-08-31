@@ -29,6 +29,11 @@ export const MODE_PRIORS: Record<string, WeibullPrior> = {
   sensor: { eta: 240, beta: 3.0 },
   spike: { eta: 168, beta: 3.0 },
   normal: { eta: 2160, beta: 1.4 },
+  // regímenes extendidos (roadmap #6)
+  "casing-leak": { eta: 600, beta: 2.0 },
+  "tubing-leak": { eta: 240, beta: 2.8 },
+  hydrates: { eta: 300, beta: 2.4 },
+  sanding: { eta: 400, beta: 2.5 },
 };
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
@@ -108,6 +113,10 @@ const PREDICATES: Partial<
   "control-issue": { key: "choke", test: (b) => (v) => Math.abs(v - b.choke) > 4 },
   sensor: { key: "pt", test: (b) => (v) => Math.abs(v - b.pt) > b.pt * 0.01 },
   spike: { key: "pt", test: (b) => (v) => Math.abs(v - b.pt) > b.pt * 0.01 },
+  "casing-leak": { key: "pc", test: (b) => (v) => v < b.pc * 0.985 },
+  "tubing-leak": { key: "pt", test: (b) => (v) => v < b.pt * 0.97 },
+  hydrates: { key: "temp", test: (b) => (v) => v < b.temp - 1.2 },
+  sanding: { key: "q", test: (b) => (v) => Math.abs(v - b.q) > b.q * 0.03 },
 };
 
 export interface RulResult {

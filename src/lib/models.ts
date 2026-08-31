@@ -269,7 +269,11 @@ export function diagnose(samples: Sample[]): Hypothesis[] {
   }
 
   const ll = clamp01((-ptS / 14) * 0.35 + (-qS / 240) * 0.35 + (dpCT / 9) * 0.3);
-  if (ll > 0.34) {
+  // una fuga en tubing (pt y pc caen EN PARALELO) imita la caída de pt del
+  // liquid loading; aquí pc NUNCA sube — si ambas presiones caen, el régimen
+  // es fuga y el liquid loading se suprime para no duplicar el diagnóstico
+  const tubingLeakLike = ptS < -10 && pcS < -7;
+  if (ll > 0.34 && !tubingLeakLike) {
     const ev = [
       `P tubing ${f1(ptS)} psi/h`,
       `Caudal ${f1(qS)} Mscf/d por hora`,
@@ -296,7 +300,7 @@ export function diagnose(samples: Sample[]): Hypothesis[] {
     ptTail.reduce((a, b) => a + (b - ptM45) ** 2, 0) / ptTail.length,
   );
   const qOscRel = qMean > 1 ? qSd / qMean : 0;
-  if (!out.some((h) => h.id === "liquid-loading") && qOscRel > 0.03 && ptOsc > 4) {
+  if (!out.some((h) => h.id === "liquid-loading") && !tubingLeakLike && qOscRel > 0.03 && ptOsc > 4) {
     out.push({
       id: "liquid-loading",
       name: "Liquid loading establecido en tubing",
@@ -321,6 +325,91 @@ export function diagnose(samples: Sample[]): Hypothesis[] {
         `Δ(P tubing − P línea) ${f1(dpTL)} psi/h`,
         `P línea ${f1(plS)} psi/h`,
         `Caudal ${f1(qS)} Mscf/d por hora`,
+      ],
+    });
+  }
+
+  // ---- regímenes extendidos (roadmap #6): fugas, hidratos, arena ---------
+
+  // fuga en el anular: P·casing cae sostenida sin reacción en tubing/flujo.
+  // Dos guardias anti-falso-positivo: (1) la caída de pc supera la pendiente
+  // máxima natural (oscilación lenta ~4 psi/h + diurnal); (2) el anular perdió
+  // ≥1.5 % de su valor en la ventana (una oscilación de 380 min apenas recorre
+  // ~1 %) — una onda no puede fingir una descarga sostenida.
+  const pcTail = samples.slice(-45).map((s) => s.pc);
+  const pcOsc = Math.sqrt(pcTail.reduce((a, b) => a + (b - pcTail.reduce((x, y) => x + y, 0) / pcTail.length) ** 2, 0) / pcTail.length);
+  const pcWin = samples.slice(-160).map((s) => s.pc);
+  const pcDropFrac = pcWin.length > 60 ? (pcWin[0] - pcWin[pcWin.length - 1]) / Math.max(1, pcWin[0]) : 0;
+  if (pcS < -6.5 && Math.abs(ptS) < 7 && qS < 12 && pcOsc < 14 && pcDropFrac > 0.015) {
+    out.push({
+      id: "casing-leak",
+      name: "Fuga de presión en anular (casing)",
+      icon: "valve",
+      conf: clamp01(0.5 + Math.min(0.38, (-pcS - 5) / 26)),
+      evidence: [
+        `P·casing ${f1(pcS)} psi/h sostenida con P·tubing estable (${f1(ptS)} psi/h)`,
+        `Oscilación de P·casing baja (σ≈${pcOsc.toFixed(1)} psi) — descarga lenta, no ruido`,
+        "El anular pierde presión sin que el pozo cambie de régimen → válvula/empaque del casing-head",
+      ],
+    });
+  }
+
+  // fuga en tubing: pt y pc caen en paralelo con pérdida de caudal
+  if (tubingLeakLike && qS < -15) {
+    out.push({
+      id: "tubing-leak",
+      name: "Fuga en tubing (comunicación tubing-anular)",
+      icon: "valve",
+      conf: clamp01(0.58 + Math.min(0.34, (-ptS - 10) / 34 + (-qS - 15) / 320)),
+      evidence: [
+        `P·tubing ${f1(ptS)} psi/h y P·casing ${f1(pcS)} psi/h cayendo EN PARALELO`,
+        `Caudal ${f1(qS)} Mscf/d por hora sin subida de P·casing (descarta liquid loading)`,
+        "El gas se fuga del tubing al anular: pérdida de presión y caudal simultánea",
+      ],
+    });
+  }
+
+  // hidratos: enfriamiento sostenido + restricción creciente aguas abajo
+  const tempS = trendPerHour(samples, "temp");
+  if (tempS < -1.1 && dpTL > 2.5) {
+    out.push({
+      id: "hydrates",
+      name: "Formación de hidratos (riesgo aguas abajo)",
+      icon: "droplet",
+      conf: clamp01(0.45 + Math.min(0.4, (-tempS - 1) / 4 + dpTL / 40)),
+      evidence: [
+        `Enfriamiento sostenido ${f1(tempS)} °C/h en cabezal`,
+        `Δ(P tubing − P línea) ${f1(dpTL)} psi/h — la restricción crece mientras la temperatura cae`,
+        "Ventana P-T acercándose a la curva de formación de hidratos: inhibir antes del taponamiento",
+      ],
+    });
+  }
+
+  // arena: ráfagas de alta frecuencia en caudal con choke estable. La escala
+  // es FÍSICA (fracción fija del caudal de referencia), no z-scores: con
+  // ráfagas frecuentes la σ se infla y los propios impactos dejarían de ser
+  // "outliers". La referencia es la MEDIANA de la ventana (robusta a ráfagas).
+  const winQ = samples.slice(-46).map((s) => s.q);
+  const winC = samples.slice(-46).map((s) => s.choke);
+  const qSorted = [...winQ].sort((a, b) => a - b);
+  const qMedian = qSorted[Math.floor(qSorted.length / 2)] || 1;
+  let burstCount = 0;
+  let chokeJump = 0;
+  for (let i = 1; i < winQ.length; i++) {
+    if (Math.abs(winQ[i] - winQ[i - 1]) > qMedian * 0.045) burstCount++;
+    chokeJump = Math.max(chokeJump, Math.abs(winC[i] - winC[i - 1]));
+  }
+  const qz = qSd / Math.max(1e-6, qMean);
+  if (chokeJump < 1.5 && burstCount >= 5 && qz > 0.02) {
+    out.push({
+      id: "sanding",
+      name: "Producción de arena (ráfagas en caudal)",
+      icon: "gauge",
+      conf: clamp01(0.45 + Math.min(0.4, (burstCount - 5) / 14 + (qz - 0.02) * 3)),
+      evidence: [
+        `${burstCount} saltos de caudal > ${Math.round(qMedian * 0.045)} Mscf/d en un minuto, con choke estable (Δ máx ${chokeJump.toFixed(1)} %)`,
+        `Oscilación relativa ${(100 * qz).toFixed(1)} % no explicada por el comando del choke`,
+        "Impactos de alta frecuencia típicos de arena: revisar trampa y velocidad vs límite de erosión",
       ],
     });
   }
@@ -394,6 +483,26 @@ export function recommend(
         id: "ci-1", prio: "MEDIA",
         text: `Verificar actuador del choke: el comando osciló ±${Math.round(13)}% sin respuesta del caudal. Probar carrera completa (stroke test).`,
       });
+    } else if (h.id === "casing-leak") {
+      recs.push(
+        { id: "cl-1", prio: "ALTA", text: "Buscar fuga en el anular (válvulas y empaques del casing-head) con detección por ultrasonido o burbujeo: P·casing descarga sin cambio de régimen del pozo." },
+        { id: "cl-2", prio: "MEDIA", text: "Monitorear la presión de anular contra su envolvente MOP/MASP y reponer el packoff si la descarga continúa." },
+      );
+    } else if (h.id === "tubing-leak") {
+      recs.push(
+        { id: "tl-1", prio: "ALTA", text: "Programar prueba de integridad del tubing (pressure test o logging): pt y pc caen en paralelo — posible comunicación tubing-anular." },
+        { id: "tl-2", prio: "MEDIA", text: "Cotejar con el registro de presiones del anular y evaluar reducción transitoria de caudal mientras se confirma la fuga." },
+      );
+    } else if (h.id === "hydrates") {
+      recs.push(
+        { id: "hy-1", prio: "ALTA", text: "Inyectar inhibidor de hidratos (metanol/MEG) aguas arriba del punto frío: enfriamiento + ΔP tubing–línea creciente = ventana de formación activa." },
+        { id: "hy-2", prio: "MEDIA", text: "Evaluar aislamiento/calefacción del flowline y reducir la expansión Joule-Thomson ajustando el choke aguas abajo." },
+      );
+    } else if (h.id === "sanding") {
+      recs.push(
+        { id: "sa-1", prio: "MEDIA", text: "Inspeccionar y drenar la trampa de arena; contrastar la velocidad de flujo contra el límite de erosión (API RP 14E) — las ráfagas sugieren sólidos." },
+        { id: "sa-2", prio: "RUTINA", text: "Programar monitoreo de arena (acoustic sand detector) y revisar el completamiento si la frecuencia de ráfagas aumenta." },
+      );
     }
   }
 

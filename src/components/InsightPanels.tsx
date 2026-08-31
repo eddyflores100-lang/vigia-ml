@@ -164,6 +164,10 @@ const SCENARIO_BTNS: { s: Scenario; icon: typeof IconDroplet }[] = [
   { s: "restriction", icon: IconValve },
   { s: "sensorFault", icon: IconChip },
   { s: "controlIssue", icon: IconGauge },
+  { s: "casingLeak", icon: IconValve },
+  { s: "tubingLeak", icon: IconValve },
+  { s: "hydrates", icon: IconDroplet },
+  { s: "sanding", icon: IconGauge },
 ];
 
 export function ScenarioControls({ onInject, active }: { onInject: (s: Scenario) => void; active: Scenario }) {

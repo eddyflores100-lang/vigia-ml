@@ -25,6 +25,8 @@ import { rulForDiag } from "./rul";
 import { dailyHistory } from "./wellHistory";
 import { fitArps, monthlyDeclinePct } from "./arps";
 import { meterCheck, suggestDia } from "./virtualMeter";
+import { adviseSetpoints } from "./setpoints";
+import { calibrateTwin, twinGapRecent } from "./twin";
 import { explainSamples } from "./explain";
 import type { ExplainResult } from "./explain";
 
@@ -62,8 +64,10 @@ export const SUGGESTED_QUESTIONS: string[] = [
   "¿Qué le pasa a este pozo?",
   "¿Por qué subió el índice de anomalía?",
   "¿Cuándo se estima la falla?",
+  "¿Cuál es el choke óptimo?",
   "¿Cuál es el EUR del pozo?",
   "¿El medidor concuerda con la medición virtual?",
+  "¿Cómo está el gemelo digital?",
   "¿Cuál es el peor pozo de la flota?",
   "Dame un resumen narrativo",
 ];
@@ -102,6 +106,10 @@ const MODE_LABEL: Record<string, string> = {
   restriction: "restricción en línea",
   "control-issue": "actuador de choke",
   normal: "operación normal",
+  "casing-leak": "fuga en anular",
+  "tubing-leak": "fuga en tubing",
+  hydrates: "formación de hidratos",
+  sanding: "producción de arena",
 };
 const modeLabel = (id: string) =>
   MODE_LABEL[id] ??
@@ -145,6 +153,18 @@ function vmSummary(ctx: CopilotContext) {
 function rulSummary(ctx: CopilotContext) {
   const top = ctx.diag.find((d) => d.id !== "normal") ?? ctx.diag[ctx.diag.length - 1] ?? { id: "normal", conf: 0 };
   return rulForDiag(top.id, top.conf, ctx.samples, ctx.base, ctx.anom.score);
+}
+
+/** Asesor de setpoints con el mismo criterio de SetpointAdvisorCard. */
+function setpointSummary(ctx: CopilotContext) {
+  const top = ctx.diag.find((d) => d.id !== "normal") ?? ctx.diag[ctx.diag.length - 1] ?? { id: "normal", conf: 0 };
+  return adviseSetpoints({ samples: ctx.samples, base: ctx.base, diagId: top.id, diagConf: top.conf, anomScore: ctx.anom.score });
+}
+
+/** Calibración del gemelo sobre la ventana estándar. */
+function twinSummary(ctx: CopilotContext) {
+  const cal = calibrateTwin(ctx.samples);
+  return { cal, gap: cal.feasible ? twinGapRecent(ctx.samples, cal) : null };
 }
 
 /** Explicabilidad del índice de anomalía sobre la ventana estándar. */
@@ -305,6 +325,54 @@ const ansMedidor: Builder = (ctx) => {
   };
 };
 
+const ansSetpoints: Builder = (ctx) => {
+  const adv = setpointSummary(ctx);
+  if (!adv.feasible) {
+    return {
+      intent: "setpoints",
+      answer: `El asesor de setpoints está en espera: ${adv.reason ?? "condiciones insuficientes"}. Se abstiene en lugar de sugerir una apertura sin base física.`,
+      bullets: [],
+    };
+  }
+  const move = adv.chokeRec - adv.chokeNow;
+  const accion = Math.abs(move) <= 1.5 ? "mantener la apertura actual" : move > 0 ? `abrir a ${nf(adv.chokeRec)} %` : `cerrar a ${nf(adv.chokeRec)} %`;
+  return {
+    intent: "setpoints",
+    answer:
+      `Choke óptimo al horizonte de ${nf(adv.horizonH)} h: ${accion} (actual ${nf(adv.chokeNow)} %). ` +
+      `Caudal esperado ${nf(adv.qRec)} Mscf/d (${adv.gainPct >= 0 ? "+" : ""}${nf(adv.gainPct, 1)} %) con supervivencia Weibull ${(adv.survRec * 100).toFixed(1)} % — la utilidad producción×supervivencia es máxima ahí. ` +
+      `Volumen adicional esperado: ${nf(adv.expectedDeltaMscf / 1000, 2)} MMscf en ${nf(adv.horizonH)} h.`,
+    bullets: [
+      ...adv.constraints.map((c) => `${c.ok ? "OK" : "VIOLADO"} · ${c.label}: ${c.detail}`),
+      ...adv.rationale.slice(0, 2),
+    ],
+  };
+};
+
+const ansGemelo: Builder = (ctx) => {
+  const { cal, gap } = twinSummary(ctx);
+  if (!cal.feasible) {
+    return {
+      intent: "gemelo",
+      answer: `El gemelo digital no se calibra con la ventana actual: ${cal.reason ?? "sin excitación"}. Mueve el choke (o espera un ajuste del operador) y reintenta.`,
+      bullets: [],
+    };
+  }
+  const g = gap;
+  return {
+    intent: "gemelo",
+    answer:
+      `Gemelo calibrado con grado ${cal.grade} (${cal.quality}/100, N=${cal.n} muestras, excitación ${nf(cal.chokeRange, 1)} % de choke): ` +
+      `q ∝ choke^${nf(cal.k, 2)}, drawdown a ${nf(cal.a, 3)} psi/Mscf, ganancia de casing b ${nf(cal.b, 3)}. ` +
+      `Brecha actual (medido − gemelo) ${g && g.gapPct >= 0 ? "+" : ""}${nf(g?.gapPct ?? NaN, 1)} % — ${g?.misaligned ? "DESALINEADO: disparar recalibración y revisar instrumentos" : "alineado, apto para detección de deriva"}.`,
+    bullets: [
+      cal.verdict,
+      `NRMSE q ${nf(cal.nrmseQ, 3)} · pt ${nf(cal.nrmsePt, 3)} · pc ${nf(cal.nrmsePc, 3)}`,
+      "La brecha sostenida > 6 % sugiere deriva de instrumentos o cambio del yacimiento no capturado",
+    ],
+  };
+};
+
 const ansEventos: Builder = (ctx) => {
   const alarmas = ctx.events.filter((e) => e.severity === "alarm").length;
   const avisos = ctx.events.filter((e) => e.severity === "warn").length;
@@ -367,7 +435,7 @@ const ansResumen: Builder = (ctx) => narrativeReport(ctx);
 const ansAyuda: Builder = (ctx) => ({
   intent: "ayuda",
   answer:
-    `Soy el copiloto de ${ctx.well.id}: consultame en lenguaje natural sobre el estado del pozo, el diagnóstico y sus evidencias, el índice de anomalía y sus drivers, la falla estimada (RUL), la declinación y EUR, la medición virtual, la calidad de telemetría, los eventos de la flota y las recomendaciones.`,
+    `Soy el copiloto de ${ctx.well.id}: consultame en lenguaje natural sobre el estado del pozo, el diagnóstico y sus evidencias, el índice de anomalía y sus drivers, la falla estimada (RUL), la declinación y EUR, la medición virtual, el choke óptimo (setpoints), el gemelo digital, la calidad de telemetría, los eventos de la flota y las recomendaciones.`,
   bullets: SUGGESTED_QUESTIONS.slice(0, 5),
 });
 
@@ -386,6 +454,16 @@ interface IntentDef {
 }
 
 const INTENTS: IntentDef[] = [
+  {
+    id: "setpoints",
+    kw: [["setpoint", "setpoints", "choke optimo", "optimo", "optimizar", "apertura", "asesor", "recomienda el choke", "mejor apertura"]],
+    build: ansSetpoints,
+  },
+  {
+    id: "gemelo",
+    kw: [["gemelo", "twin", "digital twin", "desalineado", "alineado"]],
+    build: ansGemelo,
+  },
   {
     id: "rul",
     kw: [["rul", "vida util", "falla estimada", "cuanto queda", "cuando falla", "tiempo de falla", "weibull", "prognosis", "cuando se estima", "estima la falla"]],

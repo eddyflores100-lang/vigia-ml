@@ -25,6 +25,8 @@ import { ComparePanel } from "./components/ComparePanel";
 import { ArpsCard } from "./components/ArpsCard";
 import { RulCard } from "./components/RulCard";
 import { VirtualMeterCard } from "./components/VirtualMeterCard";
+import { SetpointAdvisorCard } from "./components/SetpointAdvisorCard";
+import { TwinCard } from "./components/TwinCard";
 import { ExplainCard } from "./components/ExplainCard";
 import { CopilotPanel } from "./components/CopilotPanel";
 import { SourcePanel } from "./components/SourcePanel";
@@ -547,6 +549,11 @@ export default function App() {
           </div>
 
           <div className="flex flex-wrap gap-3">
+            <SetpointAdvisorCard diag={view.diag} samples={view.samples} base={view.sel.base} anomScore={view.anom.score} />
+            <TwinCard samples={view.samples} />
+          </div>
+
+          <div className="flex flex-wrap gap-3">
             <AnomalyPanel result={view.anom} ml={view.anomMl} />
             <DataQualityPanel dq={view.dq} />
           </div>
@@ -584,9 +591,9 @@ export default function App() {
             MODELOS EN NAVEGADOR · TENSORFLOW.JS · LSTM N1 + AUTOENCODER N2 + CLASIFICADOR N3 ·
             FALLBACK ESTADÍSTICO (HOLT / Z-SCORE / REGLAS v2.4)
           </span>
-          <span className="hidden md:inline">DCA ARPS · RUL WEIBULL · MEDICIÓN VIRTUAL · COPILOTO NL · EXPLICABILIDAD</span>
+          <span className="hidden md:inline">DCA ARPS · RUL WEIBULL · MEDICIÓN VIRTUAL · COPILOTO NL · EXPLICABILIDAD · ASESOR SETPOINTS · GEMELO DIGITAL</span>
           <span className="hidden lg:inline">ATAJOS: 1–5 POZO · P PAUSA · C VARIABLE</span>
-          <span className="ml-auto">TELEMETRÍA SINTÉTICA CON FINES DE DEMOSTRACIÓN · VIGÍA ML v0.10 · 2026</span>
+          <span className="ml-auto">TELEMETRÍA SINTÉTICA CON FINES DE DEMOSTRACIÓN · VIGÍA ML v0.11 · 2026</span>
         </div>
       </footer>
     </div>

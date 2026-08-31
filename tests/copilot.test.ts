@@ -180,3 +180,27 @@ describe("copiloto — intents sobre la flota demo", () => {
     expect(ex.score).toBeGreaterThanOrEqual(0);
   });
 });
+
+describe("copilot v0.11 — setpoints y gemelo digital", () => {
+  it("'¿Cuál es el choke óptimo?' activa el intent setpoints con consejo cuantitativo", () => {
+    const a = answerQuestion("¿Cuál es el choke óptimo?", buildCtx("GN-118"));
+    expect(a.intent).toBe("setpoints");
+    expect(a.answer).toMatch(/choke|apertura/i);
+    expect(a.answer).toMatch(/Mscf\/d/);
+    expect(a.bullets.some((b) => b.includes("Ascenso") || b.includes("Erosión"))).toBe(true);
+  });
+
+  it("'¿Cómo está el gemelo digital?' activa el intent gemelo con calidad y brecha", () => {
+    const a = answerQuestion("¿Cómo está el gemelo digital?", buildCtx("GN-118"));
+    expect(a.intent).toBe("gemelo");
+    expect(a.answer).toMatch(/gemelo/i);
+    expect(a.bullets.length).toBeGreaterThan(1);
+  });
+
+  it("los modos nuevos de falla se nombran correctamente en RUL", () => {
+    const ctx = buildCtx("PN-041"); // liquid loading en curso
+    const a = answerQuestion("¿Cuándo se estima la falla?", ctx);
+    expect(a.intent).toBe("rul");
+    expect(a.answer.length).toBeGreaterThan(10);
+  });
+});

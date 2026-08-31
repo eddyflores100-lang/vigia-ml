@@ -11,7 +11,7 @@
 [![Tailwind](https://img.shields.io/badge/Tailwind-4-38bdf8?logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
 [![Licencia](https://img.shields.io/badge/Licencia-AL--1.0-f28482.svg)](LICENSE-AL-1.0)
 [![CI](https://github.com/eddyflores100-lang/vigia-ml/actions/workflows/ci.yml/badge.svg)](https://github.com/eddyflores100-lang/vigia-ml/actions/workflows/ci.yml)
-[![Pruebas](https://img.shields.io/badge/pruebas-111%20pasando-3fb950)](#scripts)
+[![Pruebas](https://img.shields.io/badge/pruebas-140%20pasando-3fb950)](#scripts)
 [![Release](https://img.shields.io/github/v/release/eddyflores100-lang/vigia-ml?label=versi%C3%B3n&sort=semver)](https://github.com/eddyflores100-lang/vigia-ml/releases)
 [![Discussions](https://img.shields.io/badge/Discussions-bienvenida-8250df?logo=githubdiscussions)](https://github.com/eddyflores100-lang/vigia-ml/discussions)
 
@@ -134,8 +134,16 @@ src/
 | `npm run build` | Build de producción (`dist/`) |
 | `npm run preview` | Sirve el build de producción localmente |
 | `npm run typecheck` | Verificación de tipos TypeScript |
-| `npm test` | Pruebas unitarias (Vitest, 111 tests) |
+| `npm test` | Pruebas unitarias (Vitest, 140 tests) |
 | `npm run test:watch` | Pruebas en modo watch |
+
+## Qué hay de nuevo en v0.11.0
+
+- **Asesor de setpoints** (roadmap #5): nueva tarjeta que responde «¿a qué apertura pongo el choke?» maximizando la utilidad producción × supervivencia: para cada candidato de la malla 15–95 % evalúa el caudal esperado con la **medición virtual (Bean + subcrítico)** y la **supervivencia Weibull+AFT al horizonte** (`setpoints.ts`) — cerrar por debajo de la velocidad crítica de Turner acelera la acumulación de líquidos; abrir más allá del límite de erosión (API RP 14E) acelera el desgaste. Restricciones duras visibles como chips (lift/erosión/margen subcrítico/rango), ΔVolumen esperado en MMscf y curva de utilidad con marcadores AHORA→REC. Si el setpoint actual ya es el mejor, lo confirma en lugar de sugerir cambios cosméticos.
+- **Regímenes de falla extendidos** (roadmap #6): el catálogo del N3 pasa de 5 a 9 modos con 4 regímenes nuevos inyectables en el simulador y detectados por reglas físicas: **fuga en anular** (P·casing descarga sostenida ≥1.5 % con tubing estable — dos guardias anti-falso-positivo contra la oscilación lenta), **fuga en tubing** (pt y pc caen EN PARALELO con pérdida de caudal — el liquid loading se suprime automáticamente porque allí pc NUNCA sube), **hidratos** (enfriamiento sostenido + restricción creciente aguas abajo = ventana P-T de formación) y **producción de arena** (ráfagas de alta frecuencia Δq con escala física fija y choke estable — mediana robusta en lugar de z-scores que se auto-anulan). Cada modo trae priors Weibull propios para el RUL, recomendaciones operativas (ultrasonido, pressure test, inhibidor MEG, trampa de arena) y soporte en el copiloto.
+- **Calibración del gemelo digital** (roadmap #8): nueva tarjeta que ajusta la respuesta determinista del pozo sobre la ventana reciente — `q ∝ choke^k`, drawdown `a` de P·tubing y ganancia `b` de P·casing (`twin.ts`) — y reporta la **calidad** (NRMSE ponderado q/pt/pc, grado A–D), la **brecha actual** medido−gemelo y la bandera de **desalineación** (> 6 % sostenido = recalibrar / revisar instrumentos). Sin excitación (choke plano) la calibración **se rechaza con diagnóstico explícito** en lugar de inventar parámetros.
+- **Copiloto ampliado**: 2 intenciones nuevas — «¿Cuál es el choke óptimo?» (setpoints con restricciones) y «¿Cómo está el gemelo digital?» (calidad + brecha) — y los modos nuevos nombrados en las respuestas de RUL.
+- **Pruebas**: +29 tests (Turner/API-14E monotonicidades, curva q(choke) consistente con el Cd calibrado, utilidad ponderada por supervivencia, detección de los 4 regímenes nuevos con cero falsos positivos en pozos estables, recuperación de k/a/b del gemelo, rechazo sin excitación, brecha y desalineación inyectada, determinismo) — **140 en total**.
 
 ## Qué hay de nuevo en v0.10.0
 
@@ -228,5 +236,5 @@ Este proyecto busca validación de ingenieros de producción, analistas de opera
 ---
 
 <div align="center">
-<sub>VIGÍA ML v0.10.0 · Telemetría sintética con fines de demostración · Entrena, vigila, pregunta.</sub>
+<sub>VIGÍA ML v0.11.0 · Telemetría sintética con fines de demostración · Entrena, vigila, pregunta.</sub>
 </div>

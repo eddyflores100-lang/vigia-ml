@@ -20,6 +20,10 @@ const MODE_LABEL: Record<string, string> = {
   restriction: "Restricción en línea",
   "control-issue": "Actuador de choke",
   normal: "Integridad general",
+  "casing-leak": "Fuga en anular",
+  "tubing-leak": "Fuga en tubing",
+  hydrates: "Hidratos",
+  sanding: "Producción de arena",
 };
 const modeLabel = (id: string) =>
   MODE_LABEL[id] ?? (id.startsWith("sensor-") || id.startsWith("spike-")

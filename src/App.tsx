@@ -21,6 +21,13 @@ import { createEngine } from "./lib/ml/engineProxy";
 import { buildWellReport, downloadWellCsv, downloadWellReportJson, printWellReport } from "./lib/export";
 import { fleetCompare } from "./lib/fleet";
 import type { FleetRow } from "./lib/fleet";
+import { parseTelemetryCsv } from "./lib/replay/csvParser";
+import type { QualityReport } from "./lib/replay/csvParser";
+import { ReplayEngine } from "./lib/replay/replayEngine";
+import type { ReplaySpeed } from "./lib/replay/replayEngine";
+import type { ReplayUiState } from "./components/ReplayPanel";
+import { ReplayPanel } from "./components/ReplayPanel";
+import { NodalCard } from "./components/NodalCard";
 import { ComparePanel } from "./components/ComparePanel";
 import { ArpsCard } from "./components/ArpsCard";
 import { RulCard } from "./components/RulCard";
@@ -201,7 +208,8 @@ export default function App() {
       busy = true;
       try {
         const wells = fleetRef.current!;
-        if (!paused) wells.forEach((w) => w.tick());
+        const replayWellId = replayRef.current.engine ? replayRef.current.wellId : null;
+        if (!paused) wells.forEach((w) => { if (w.id !== replayWellId) w.tick(); });
 
         // niveles de flota: si hay caché ML se mantiene (evita parpadeo stats↔ML)
         const cache = mlCacheRef.current;
@@ -257,7 +265,22 @@ export default function App() {
             /* inferencia fallida → se mantiene el pipeline estadístico */
           }
         }
-        if (alive) setTickN((n) => n + 1);
+        if (alive) {
+          setTickN((n) => n + 1);
+          // puntuación del replay: verdad de campo vs diagnóstico dominante
+          const rw = replayRef.current;
+          if (rw.engine && rw.engine.progress.idx > 0) {
+            const sel = wells.find((w) => w.id === rw.wellId) ?? wells[0];
+            const statDiag = diagnose(sel.buf.slice(-160));
+            const mlRes = mlCacheRef.current.get(sel.id);
+            const merged =
+              mlRes && mlRes.probs.length > 0
+                ? mergeDiagnosis(statDiag, mlRes.probs, sel.buf.slice(-160))
+                : statDiag;
+            rw.engine.scoreTick(merged[0]?.id ?? "normal");
+            setReplayUi(replaySnapshot());
+          }
+        }
       } finally {
         busy = false;
       }
@@ -366,6 +389,207 @@ export default function App() {
     };
   }, []);
 
+  // --------------------- replay de histórico CSV (v0.12) ---------------------
+  // El reproductor toma el pozo seleccionado al momento de la carga: limpia su
+  // buffer, deriva la base operativa del propio histórico (medianas de arranque)
+  // y alimenta las muestras al ritmo de la velocidad elegida. El simulador no
+  // hace tick sobre ese pozo mientras el replay esté activo.
+  const replayRef = useRef<{
+    engine: ReplayEngine | null;
+    fileName: string | null;
+    quality: QualityReport | null;
+    warnings: string[];
+    speed: ReplaySpeed;
+    wellId: string | null;
+    firstTs: number;
+    lastTs: number;
+  }>({ engine: null, fileName: null, quality: null, warnings: [], speed: 60, wellId: null, firstTs: 0, lastTs: 0 });
+  const [replayUi, setReplayUi] = useState<ReplayUiState>({
+    fileName: null,
+    status: "idle",
+    idx: 0,
+    total: 0,
+    ts: 0,
+    firstTs: 0,
+    lastTs: 0,
+    etaSec: 0,
+    speed: 60,
+    hasLabels: false,
+    currentLabel: null,
+    quality: null,
+    warnings: [],
+    score: null,
+  });
+  const replaySnapRef = useRef(0);
+
+  const replaySnapshot = (): ReplayUiState => {
+    const r = replayRef.current;
+    if (!r.engine) {
+      return { ...replayUi, status: "idle", idx: 0, total: 0 };
+    }
+    const p = r.engine.progress;
+    return {
+      fileName: r.fileName,
+      status: p.status,
+      idx: p.idx,
+      total: p.total,
+      ts: p.ts,
+      firstTs: r.firstTs,
+      lastTs: r.lastTs,
+      etaSec: p.etaSec,
+      speed: r.speed,
+      hasLabels: r.engine.hasLabels,
+      currentLabel: r.engine.currentLabel,
+      quality: r.quality,
+      warnings: r.warnings,
+      score: r.engine.score(),
+    };
+  };
+
+  const loadReplayText = (text: string, name: string) => {
+    if (text === "") {
+      setReplayUi({ ...replayUi, fileName: name, warnings: [`No se pudo cargar ${name} (recurso no disponible).`] });
+      return;
+    }
+    let parsed;
+    try {
+      parsed = parseTelemetryCsv(text);
+    } catch (err) {
+      setReplayUi({
+        ...replayUi,
+        fileName: name,
+        warnings: [err instanceof Error ? err.message : "CSV no parseable"],
+      });
+      return;
+    }
+    const wells = fleetRef.current!;
+    const target = wells.find((w) => w.id === selIdRef.current) ?? wells[0];
+
+    // base operativa derivada del propio histórico (primeras ~120 filas válidas)
+    const head = parsed.rows.slice(0, 120);
+    const med = (sel: (r: (typeof head)[number]) => number | null) => {
+      const v = head.map(sel).filter((x): x is number => x !== null && Number.isFinite(x)).sort((a, b) => a - b);
+      return v.length ? v[Math.floor(v.length / 2)] : target.base.q;
+    };
+    target.base = {
+      pt: med((r) => r.pt),
+      pc: med((r) => r.pc),
+      pl: med((r) => r.pl),
+      temp: med((r) => r.temp),
+      q: med((r) => r.q),
+      choke: med((r) => r.choke),
+    };
+
+    const firstTs = parsed.rows[0].ts;
+    const lastTs = parsed.rows[parsed.rows.length - 1].ts;
+    const sink = (batch: ReturnType<ReplayEngine["pump"]>) => {
+      for (const r of batch) {
+        const last = target.buf.length
+          ? target.last
+          : { m: 0, pt: 0, pc: 0, pl: 0, temp: 0, q: 0, choke: 0 };
+        target.buf.push(
+          sanitizeSample({
+            m: Math.round((r.ts - firstTs) / 60000),
+            pt: r.pt ?? last.pt,
+            pc: r.pc ?? last.pc,
+            pl: r.pl ?? last.pl,
+            temp: r.temp ?? last.temp,
+            q: r.q ?? last.q,
+            choke: r.choke ?? last.choke,
+          }),
+        );
+      }
+      if (target.buf.length > 520) target.buf.splice(0, target.buf.length - 520);
+    };
+
+    const engine = new ReplayEngine(parsed.rows, sink);
+    replayRef.current = {
+      engine,
+      fileName: name,
+      quality: parsed.quality,
+      warnings: parsed.warnings,
+      speed: replayRef.current.speed,
+      wellId: target.id,
+      firstTs,
+      lastTs,
+    };
+    engine.setSpeed(replayRef.current.speed);
+
+    // arranque limpio: buffer del pozo vacío + pre-llenado con las primeras
+    // filas (contexto inicial para el pipeline) + selección del pozo
+    target.buf = [];
+    target.events = [];
+    const prefill = Math.min(160, parsed.rows.length);
+    sink(parsed.rows.slice(0, prefill));
+    engine.seek(prefill);
+    target.log("info", `Replay cargado: ${name} (${parsed.quality.nValid} filas)`);
+    setSelId(target.id);
+    setPaused(true); // el simulador queda en pausa mientras se reproduce
+    setTickN((n) => n + 1);
+    setReplayUi(replaySnapshot());
+  };
+
+  const replayPlay = () => {
+    const r = replayRef.current;
+    if (!r.engine) return;
+    r.engine.play();
+    setPaused(true);
+    setReplayUi(replaySnapshot());
+  };
+
+  const replayPause = () => {
+    replayRef.current.engine?.pause();
+    setReplayUi(replaySnapshot());
+  };
+
+  const replayStop = () => {
+    replayRef.current.engine?.stop();
+    setReplayUi(replaySnapshot());
+  };
+
+  const replaySpeed = (s: ReplaySpeed) => {
+    replayRef.current.speed = s;
+    replayRef.current.engine?.setSpeed(s);
+    setReplayUi(replaySnapshot());
+  };
+
+  const replayNextEvent = () => {
+    const eng = replayRef.current.engine;
+    if (!eng) return;
+    const nxt = eng.nextEventTs();
+    if (nxt !== null) eng.seekToTs(nxt);
+    setReplayUi(replaySnapshot());
+  };
+
+  const replayRestart = () => {
+    replayRef.current.engine?.reset();
+    setReplayUi(replaySnapshot());
+  };
+
+  // bombeo del reproductor: emite filas a su ritmo (independiente del ciclo
+  // de 1.5 s) y refresca la UI de progreso con moderación (≤ 2.5 Hz)
+  useEffect(() => {
+    const id = setInterval(() => {
+      const r = replayRef.current;
+      if (!r.engine || r.engine.progress.status !== "playing") return;
+      r.engine.pump();
+      const t = performance.now();
+      if (t - replaySnapRef.current > 400) {
+        replaySnapRef.current = t;
+        setReplayUi(replaySnapshot());
+      }
+    }, 250);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      replayRef.current.engine?.stop();
+      replayRef.current.engine = null;
+    };
+  }, []);
+
   const inject = (s: Scenario) => {
     view.sel.setScenario(s);
     refreshLevels(fleetRef.current!, true);
@@ -448,8 +672,21 @@ export default function App() {
       dq: view.dq,
       events: view.events,
       fleet: view.summaries.map((s) => ({ id: s.id, name: s.name, level: s.status, score: s.score, qNow: s.qNow })),
+      replay: replayUi.fileName
+        ? {
+            fileName: replayUi.fileName,
+            status: replayUi.status,
+            idx: replayUi.idx,
+            total: replayUi.total,
+            hasLabels: replayUi.hasLabels,
+            accuracy: replayUi.score && Number.isFinite(replayUi.score.accuracy) ? replayUi.score.accuracy : null,
+            meanDelayMin: replayUi.score?.meanDelayMin ?? null,
+            missedEvents: replayUi.score?.missedEvents ?? 0,
+            detectedEvents: (replayUi.score?.events.length ?? 0) - (replayUi.score?.missedEvents ?? 0),
+          }
+        : null,
     }),
-    [view],
+    [view, replayUi],
   );
 
   return (
@@ -553,6 +790,8 @@ export default function App() {
             <TwinCard samples={view.samples} />
           </div>
 
+          <NodalCard samples={view.samples} base={view.sel.base} />
+
           <div className="flex flex-wrap gap-3">
             <AnomalyPanel result={view.anom} ml={view.anomMl} />
             <DataQualityPanel dq={view.dq} />
@@ -570,6 +809,19 @@ export default function App() {
             onUrl={setSrcUrl}
             onConnect={connectSource}
             onDisconnect={disconnectSource}
+          />
+
+          <ReplayPanel
+            ui={replayUi}
+            actions={{
+              onLoadText: loadReplayText,
+              onPlay: replayPlay,
+              onPause: replayPause,
+              onStop: replayStop,
+              onSpeed: replaySpeed,
+              onNextEvent: replayNextEvent,
+              onRestart: replayRestart,
+            }}
           />
 
           <TrainingPanel state={mlState} onRetrain={startTraining} onCancel={cancelTraining} />
@@ -591,9 +843,24 @@ export default function App() {
             MODELOS EN NAVEGADOR · TENSORFLOW.JS · LSTM N1 + AUTOENCODER N2 + CLASIFICADOR N3 ·
             FALLBACK ESTADÍSTICO (HOLT / Z-SCORE / REGLAS v2.4)
           </span>
-          <span className="hidden md:inline">DCA ARPS · RUL WEIBULL · MEDICIÓN VIRTUAL · COPILOTO NL · EXPLICABILIDAD · ASESOR SETPOINTS · GEMELO DIGITAL</span>
+          <span className="hidden md:inline">DCA ARPS · RUL WEIBULL · MEDICIÓN VIRTUAL · COPILOTO NL · EXPLICABILIDAD · ASESOR SETPOINTS · GEMELO DIGITAL · NODAL · REPLAY CSV</span>
           <span className="hidden lg:inline">ATAJOS: 1–5 POZO · P PAUSA · C VARIABLE</span>
-          <span className="ml-auto">TELEMETRÍA SINTÉTICA CON FINES DE DEMOSTRACIÓN · VIGÍA ML v0.11 · 2026</span>
+          <span className="hidden lg:inline">
+            <a href="./" className="text-fg3 hover:text-crit underline decoration-dotted underline-offset-2 transition-colors">
+              VOLVER AL SITIO
+            </a>
+            {" · "}
+            <a
+              href="./"
+              onClick={() => {
+                import("./landing/gate").then((g) => g.clearGrant());
+              }}
+              className="text-fg3 hover:text-crit underline decoration-dotted underline-offset-2 transition-colors"
+            >
+              CERRAR SESIÓN
+            </a>
+          </span>
+          <span className="ml-auto">TELEMETRÍA SINTÉTICA + DATOS VOLVE (EQUINOR) · VIGÍA ML v0.12 · 2026</span>
         </div>
       </footer>
     </div>

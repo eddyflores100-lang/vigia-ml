@@ -3,6 +3,13 @@ import ReactDOM from "react-dom/client";
 import "./index.css";
 import App from "./App.tsx";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { getGrant } from "./landing/gate";
+
+// Gate de acceso: la consola solo abre para visitantes que pasaron por el
+// formulario o la clave del landing. Sin concesión → de vuelta al brief.
+if (!getGrant()) {
+  window.location.replace("./");
+}
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

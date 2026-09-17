@@ -1,0 +1,274 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+   VIGÍA · estilos del landing (brief público)
+   Tema: industrial nocturno — acero profundo + cobre/ámbar + teal técnico.
+   Coherente con la consola (misma familia tipográfica), pero con mayor
+   dramatismo: hero fotográfico, rejilla técnica, revelado al hacer scroll.
+--------------------------------------------------------------------------- */
+
+@theme {
+  --font-display: "Chakra Petch", "IBM Plex Sans", sans-serif;
+  --font-body: "IBM Plex Sans", sans-serif;
+  --font-mono: "IBM Plex Mono", monospace;
+
+  --color-ink: #05090c;
+  --color-deep: #081014;
+  --color-panel: #0c161c;
+  --color-panel2: #102029;
+  --color-line: #1c313a;
+  --color-line2: #2a4550;
+  --color-fg: #eaf3f4;
+  --color-fg2: #a8bfc5;
+  --color-fg3: #64818b;
+  --color-ok: #3fd0b6;
+  --color-watch: #f2b33d;
+  --color-alert: #f2954a;
+  --color-crit: #f26d5f;
+  --color-fc: #7fb4e6;
+  --color-copper: #e5a06c;
+  --color-copper2: #f0b27a;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--color-ink);
+  color: var(--color-fg);
+  font-family: var(--font-body);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: rgba(229, 160, 108, 0.35);
+}
+
+/* ---------- rejilla técnica de fondo ---------- */
+.tech-grid {
+  background-image:
+    repeating-linear-gradient(0deg, rgba(168, 191, 197, 0.05) 0 1px, transparent 1px 56px),
+    repeating-linear-gradient(90deg, rgba(168, 191, 197, 0.05) 0 1px, transparent 1px 56px);
+}
+
+/* ---------- hero ---------- */
+.hero-shade {
+  background:
+    linear-gradient(180deg, rgba(5, 9, 12, 0.55) 0%, rgba(5, 9, 12, 0.25) 34%, rgba(5, 9, 12, 0.82) 82%, var(--color-ink) 100%),
+    linear-gradient(100deg, rgba(5, 9, 12, 0.92) 6%, rgba(5, 9, 12, 0.35) 46%, rgba(229, 160, 108, 0.12) 100%);
+}
+
+.hero-scan::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(255, 255, 255, 0.022) 0 1px,
+    transparent 1px 4px
+  );
+  mix-blend-mode: overlay;
+}
+
+/* ---------- texto con brillo ---------- */
+.glow-copper {
+  text-shadow: 0 0 34px rgba(229, 160, 108, 0.4);
+}
+.glow-ok {
+  text-shadow: 0 0 30px rgba(63, 208, 182, 0.35);
+}
+
+/* ---------- línea de acento ---------- */
+.rule {
+  height: 2px;
+  background: linear-gradient(90deg, var(--color-copper), rgba(229, 160, 108, 0) 78%);
+}
+
+/* ---------- botones ---------- */
+.btn-primary {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.85rem 1.7rem;
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  font-size: 0.95rem;
+  color: #0b1310;
+  background: linear-gradient(135deg, var(--color-copper2), var(--color-copper));
+  border: 1px solid rgba(240, 178, 122, 0.65);
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+}
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 38px -14px rgba(229, 160, 108, 0.55);
+  filter: brightness(1.06);
+}
+
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.85rem 1.6rem;
+  font-family: var(--font-display);
+  font-weight: 500;
+  letter-spacing: 0.09em;
+  font-size: 0.95rem;
+  color: var(--color-fg2);
+  border: 1px solid var(--color-line2);
+  background: rgba(12, 22, 28, 0.55);
+  backdrop-filter: blur(6px);
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+  transition: color 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+.btn-ghost:hover {
+  color: var(--color-fg);
+  border-color: rgba(63, 208, 182, 0.55);
+  background: rgba(16, 32, 41, 0.75);
+}
+
+/* ---------- marquee tecnológico ---------- */
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+.marquee-track {
+  display: inline-flex;
+  white-space: nowrap;
+  animation: marquee 36s linear infinite;
+}
+.marquee-track:hover {
+  animation-play-state: paused;
+}
+
+/* ---------- revelado al hacer scroll ---------- */
+.reveal {
+  opacity: 0;
+  transform: translateY(26px);
+  transition: opacity 0.7s cubic-bezier(0.2, 0.7, 0.3, 1), transform 0.7s cubic-bezier(0.2, 0.7, 0.3, 1);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+.reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .marquee-track {
+    animation: none;
+  }
+}
+
+/* ---------- tarjetas de capacidad ---------- */
+.cap-card {
+  position: relative;
+  background: linear-gradient(180deg, rgba(16, 32, 41, 0.5), rgba(10, 18, 22, 0.85));
+  border: 1px solid var(--color-line);
+  transition: transform 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
+}
+.cap-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(229, 160, 108, 0.45);
+  box-shadow: 0 22px 44px -26px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(229, 160, 108, 0.08);
+}
+
+/* ---------- capturas con marco técnico ---------- */
+.shot-frame {
+  position: relative;
+  border: 1px solid var(--color-line2);
+  background: var(--color-panel);
+  padding: 8px 8px 30px;
+  box-shadow: 0 30px 60px -34px rgba(0, 0, 0, 0.95);
+}
+.shot-frame::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, var(--color-line2) 12px, transparent 12px) left / 1px 12px no-repeat,
+    linear-gradient(180deg, var(--color-line2) 12px, transparent 12px) top / 12px 1px no-repeat;
+}
+.shot-frame::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(270deg, var(--color-copper) 12px, transparent 12px) right / 1px 12px no-repeat,
+    linear-gradient(0deg, var(--color-copper) 12px, transparent 12px) bottom / 12px 1px no-repeat;
+  opacity: 0.65;
+}
+
+/* ---------- pipeline N1-N5 ---------- */
+.pipe-node {
+  position: relative;
+  border: 1px solid var(--color-line2);
+  background: linear-gradient(180deg, rgba(16, 32, 41, 0.7), rgba(8, 16, 20, 0.9));
+}
+.pipe-node::after {
+  content: "";
+  position: absolute;
+  right: -19px;
+  top: 50%;
+  width: 18px;
+  height: 1px;
+  background: linear-gradient(90deg, var(--color-line2), var(--color-copper));
+}
+.pipe-node:last-child::after {
+  display: none;
+}
+
+/* ---------- formulario ---------- */
+.field {
+  width: 100%;
+  background: rgba(8, 16, 20, 0.8);
+  border: 1px solid var(--color-line);
+  color: var(--color-fg);
+  padding: 0.7rem 0.9rem;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  outline: none;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+.field:focus {
+  border-color: rgba(229, 160, 108, 0.6);
+  box-shadow: 0 0 0 3px rgba(229, 160, 108, 0.09);
+}
+.field::placeholder {
+  color: var(--color-fg3);
+}
+select.field option {
+  background: var(--color-deep);
+}
+
+/* ---------- scrollbar ---------- */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-ink);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-line);
+  border: 2px solid var(--color-ink);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-line2);
+}

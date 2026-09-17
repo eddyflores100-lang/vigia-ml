@@ -27,6 +27,7 @@ import { fitArps, monthlyDeclinePct } from "./arps";
 import { meterCheck, suggestDia } from "./virtualMeter";
 import { adviseSetpoints } from "./setpoints";
 import { calibrateTwin, twinGapRecent } from "./twin";
+import { nodalAnalysis } from "./nodal";
 import { explainSamples } from "./explain";
 import type { ExplainResult } from "./explain";
 
@@ -51,6 +52,18 @@ export interface CopilotContext {
   dq: DataQuality;
   events: WellEvent[];
   fleet: FleetSummaryRow[];
+  /** Estado del reproductor de histórico (null si no hay CSV cargado). */
+  replay?: {
+    fileName: string;
+    status: string;
+    idx: number;
+    total: number;
+    hasLabels: boolean;
+    accuracy: number | null;
+    meanDelayMin: number | null;
+    missedEvents: number;
+    detectedEvents: number;
+  } | null;
 }
 
 export interface CopilotAnswer {
@@ -65,6 +78,8 @@ export const SUGGESTED_QUESTIONS: string[] = [
   "¿Por qué subió el índice de anomalía?",
   "¿Cuándo se estima la falla?",
   "¿Cuál es el choke óptimo?",
+  "¿Cuál es el punto de operación?",
+  "¿Cómo va el replay del histórico?",
   "¿Cuál es el EUR del pozo?",
   "¿El medidor concuerda con la medición virtual?",
   "¿Cómo está el gemelo digital?",
@@ -373,6 +388,60 @@ const ansGemelo: Builder = (ctx) => {
   };
 };
 
+const ansNodal: Builder = (ctx) => {
+  const r = nodalAnalysis(ctx.samples, ctx.base);
+  if (!r.feasible) {
+    return {
+      intent: "nodal",
+      answer: `El análisis nodal no está disponible: ${r.reason ?? "ventana insuficiente"}. Sin historial defendible de caudal y presión no se dibujan curvas.`,
+      bullets: [],
+    };
+  }
+  const gapQ = ((r.qOp - r.current.q) / Math.max(1, r.current.q)) * 100;
+  return {
+    intent: "nodal",
+    answer:
+      `Punto de operación natural (IPR ∩ VLP en el nodo de cabezal): ${nf(r.qOp)} Mscf/d a ${nf(r.ptOp)} psi. ` +
+      `El pozo opera ahora a ${nf(r.current.q)} Mscf/d — una brecha de ${gapQ >= 0 ? "+" : ""}${nf(gapQ, 1)} % respecto al punto natural. ` +
+      `${r.windowOk ? "El punto está dentro de la ventana operativa Turner–erosión." : "ATENCIÓN: el punto cae fuera de la ventana Turner–erosión."}`,
+    bullets: [
+      `IPR por regresión pt~q: pendiente ${nf(r.aSlope, 3)} psi/Mscf (R² ${nf(r.r2, 3)})`,
+      `VLP por inversa de Bean al choke ${nf(r.chokePct)} % · Cd ${r.cd !== null ? nf(r.cd, 2) : "0.82 (por defecto)"}`,
+      `Ventana operativa: Turner mínimo ${nf(r.turnerQ ?? NaN)} · erosión API RP 14E máxima ${nf(r.erosionQ ?? NaN)} Mscf/d`,
+    ],
+  };
+};
+
+const ansReplay: Builder = (ctx) => {
+  const rp = ctx.replay ?? null;
+  if (!rp) {
+    return {
+      intent: "replay",
+      answer:
+        "No hay histórico en reproducción. Carga un CSV en el panel «Replay de histórico» (el demo etiquetado de 55 h, o los datos reales Volve F-12/F-11 incluidos) y el pipeline correrá sobre esa telemetría.",
+      bullets: [
+        "Columnas: ts, pt, pc, pl, temp, q, choke (event opcional)",
+        "Con etiquetas de evento, la consola puntúa su detección con matriz de confusión",
+      ],
+    };
+  }
+  const pct = rp.total > 0 ? Math.round((rp.idx / rp.total) * 100) : 0;
+  return {
+    intent: "replay",
+    answer:
+      `Replay «${rp.fileName}»: ${rp.status === "playing" ? "reproduciendo" : rp.status === "paused" ? "en pausa" : rp.status === "done" ? "completado" : "listo"} — ${nf(rp.idx)} de ${nf(rp.total)} filas (${pct} %).` +
+      (rp.hasLabels && rp.accuracy !== null
+        ? ` Detección contra etiquetas: exactitud ${nf(rp.accuracy * 100, 1)} %${rp.meanDelayMin !== null ? `, retardo medio ${nf(rp.meanDelayMin, 1)} min` : ""}.`
+        : " El CSV no trae etiquetas: el pipeline corre sin puntuación."),
+    bullets: rp.hasLabels && rp.accuracy !== null
+      ? [
+          `Eventos detectados: ${rp.detectedEvents}/${rp.detectedEvents + rp.missedEvents}`,
+          rp.missedEvents > 0 ? `${rp.missedEvents} evento(s) sin detectar — revisa la matriz en el panel` : "Todos los eventos etiquetados fueron detectados",
+        ]
+      : ["Añade una columna event (p. ej. liquid_loading) para puntuar la detección"],
+  };
+};
+
 const ansEventos: Builder = (ctx) => {
   const alarmas = ctx.events.filter((e) => e.severity === "alarm").length;
   const avisos = ctx.events.filter((e) => e.severity === "warn").length;
@@ -454,6 +523,16 @@ interface IntentDef {
 }
 
 const INTENTS: IntentDef[] = [
+  {
+    id: "nodal",
+    kw: [["punto de operacion", "analisis nodal", "nodal", "ipr", "vlp", "curvas", "interseccion", "ventana operativa"]],
+    build: ansNodal,
+  },
+  {
+    id: "replay",
+    kw: [["replay", "reproduc", "csv", "volve", "historico", "matriz de confusion", "etiquetas", "retardo"]],
+    build: ansReplay,
+  },
   {
     id: "setpoints",
     kw: [["setpoint", "setpoints", "choke optimo", "optimo", "optimizar", "apertura", "asesor", "recomienda el choke", "mejor apertura"]],

@@ -11,13 +11,14 @@
 [![Tailwind](https://img.shields.io/badge/Tailwind-4-38bdf8?logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
 [![Licencia](https://img.shields.io/badge/Licencia-AL--1.0-f28482.svg)](LICENSE-AL-1.0)
 [![CI](https://github.com/alicelabs-llc/vigia-ml/actions/workflows/ci.yml/badge.svg)](https://github.com/alicelabs-llc/vigia-ml/actions/workflows/ci.yml)
-[![Pruebas](https://img.shields.io/badge/pruebas-140%20pasando-3fb950)](#scripts)
-[![Release](https://img.shields.io/github/v/release/eddyflores100-lang/vigia-ml?label=versi%C3%B3n&sort=semver)](https://github.com/alicelabs-llc/vigia-ml/releases)
+[![E2E](https://github.com/alicelabs-llc/vigia-ml/actions/workflows/e2e.yml/badge.svg)](https://github.com/alicelabs-llc/vigia-ml/actions/workflows/e2e.yml)
+[![Pruebas](https://img.shields.io/badge/pruebas-173%20unit%20·%2011%20E2E-3fb950)](#scripts)
+[![Release](https://img.shields.io/github/v/release/alicelabs-llc/vigia-ml?label=versi%C3%B3n&sort=semver)](https://github.com/alicelabs-llc/vigia-ml/releases)
 [![Discussions](https://img.shields.io/badge/Discussions-bienvenida-8250df?logo=githubdiscussions)](https://github.com/alicelabs-llc/vigia-ml/discussions)
 
 *Pronóstico LSTM · Detección de anomalías con autoencoder · Clasificación de fallas con red neuronal — todo entrena y ejecuta **en vivo** en tu navegador, sin servidor.*
 
-> ▶️ **Demo en vivo: [alicelabs-llc.github.io/vigia-ml/](https://alicelabs-llc.github.io/vigia-ml/)** — sin instalación: abre el enlace y los modelos se entrenan en tu navegador.
+> ▶️ **Sitio público: [alicelabs-llc.github.io/vigia-ml/](https://alicelabs-llc.github.io/vigia-ml/)** — brief del producto con acceso a la consola vía **formulario o clave de demo** (`VIGIA-2026`). La consola vive en `/app.html`.
 
 </div>
 
@@ -112,18 +113,24 @@ flowchart LR
 
 ```
 src/
+├── landing/                   # sitio público (brief) — sin TensorFlow
+│   ├── Landing.tsx            # hero, problema, capacidades, pipeline, roadmap
+│   ├── gate-section.tsx       # formulario + clave de acceso
+│   ├── gate.ts                # concesión en localStorage + clave VIGIA-2026
+│   └── landing.css            # tema industrial nocturno + revelado por scroll
 ├── lib/
 │   ├── sim.ts                 # simulador físico de pozos + flota demo
 │   ├── models.ts              # pipeline estadístico (Holt, z-score, reglas, N4/N5)
+│   ├── nodal.ts               # análisis nodal IPR/VLP en el nodo de cabezal
+│   ├── replay/
+│   │   ├── csvParser.ts       # parser CSV flexible + reporte de calidad
+│   │   └── replayEngine.ts    # reproducción 1×–900× + puntuador de detección
 │   └── ml/
 │       ├── dataGen.ts         # dataset de entrenamiento (ventanas etiquetadas)
 │       └── engine.ts          # motor TF.js: 3 modelos + entrenamiento + inferencia
-└── components/
-    ├── ForecastChart.tsx      # N1 · historia + pronóstico LSTM/Holt con IC
-    ├── InsightPanels.tsx      # N2 · medidor de anomalía + calidad de datos
-    ├── RightRail.tsx          # N3/N4/N5 · diagnóstico, proyección, recomendaciones
-    ├── TrainingPanel.tsx      # ML · entrenamiento en vivo + matriz de confusión
-    └── ...                    # TopBar, WellRail, KpiGrid, bits
+├── components/                # tarjetas de la consola (KPIs, RUL, MV, gemelo, nodal, replay…)
+└── e2e/                       # Playwright: landing + gate + journey de consola
+public/data/                   # demo-etiquetado.csv + volve-f12.csv + volve-f11.csv
 ```
 
 ## Scripts
@@ -131,11 +138,23 @@ src/
 | Comando | Descripción |
 |---------|-------------|
 | `npm run dev` | Servidor de desarrollo (Vite, puerto 3000) |
-| `npm run build` | Build de producción (`dist/`) |
+| `npm run build` | Build de producción (`dist/`, MPA: landing + consola) |
 | `npm run preview` | Sirve el build de producción localmente |
 | `npm run typecheck` | Verificación de tipos TypeScript |
-| `npm test` | Pruebas unitarias (Vitest, 140 tests) |
+| `npm test` | Pruebas unitarias (Vitest, 173 tests) |
 | `npm run test:watch` | Pruebas en modo watch |
+| `npm run test:e2e` | Pruebas E2E con Playwright (11 tests, build + preview) |
+| `npm run gen:demo-csv` | Regenera `public/data/demo-etiquetado.csv` desde el simulador |
+
+## Qué hay de nuevo en v0.12.0 · «Piloto con datos reales»
+
+- **Sitio público + gate de acceso**: el despliegue pasa de "app directa" a **MPA** — `index.html` es un landing tipo brief (hero fotográfico industrial, problema, 9 capacidades, pipeline N1→N5, datos reales, tecnología, roadmap y CTA) y la consola vive en **`app.html`**, protegida por un gate del lado cliente: **formulario de contacto** (nombre/correo/empresa/rol, registrado solo en `localStorage`) o **clave de demo** (`VIGIA-2026`, configurable en `src/landing/gate.ts`). Sin concesión, `app.html` redirige al brief. El landing **no carga TensorFlow** (~32 KB de JS); el chunk de 1,6 MB solo se descarga al entrar a la consola.
+- **Replay de histórico CSV + matriz de confusión** (la killer feature): panel «Replay de histórico» que carga un CSV por pozo (separadores `, ;` tab, decimales con punto o coma, fechas ISO/epoch/DD-MM-AAAA, sinónimos de columnas ES/EN) y lo **reproduce a 1×–900×** contra el pipeline completo. El parser reporta calidad (huecos, duplicados, filas descartadas, valores fuera de rango, columnas sin fuente) y la **base operativa del pozo se re-deriva del propio histórico** (medianas de arranque). Si el CSV trae columna `event`, la consola **puntúa su propia detección**: matriz de confusión 6×6 (5 clases + «otras»), precisión/recuerdo/F1 por clase, **retardo de detección por evento** y eventos no detectados — «tu histórico, tu modelo, esta habría sido la detección». Incluye salto a siguiente evento y reinicio.
+- **Datos reales Volve (Equinor)**: dos pozos del campo Volve incluidos en `public/data/` — **F-12 H** (3.056 días, 2008–2016, pico 30.057 Mscf/d) y **F-11 H** (1.165 días) — convertidos al formato VIGÍA con mapeo documentado (AVG_WHP_P→pt, AVG_ANNULUS_PRESS→pc, AVG_WHT_P→temp, BORE_GAS_VOL→q con conversión Sm³/d→Mscf/d, AVG_CHOKE_SIZE_P→choke; Volve no registra presión de línea: la columna `pl` se omite y el reproductor mantiene el último valor). Licencia del dataset: CC BY-NC-SA 4.0, con atribución.
+- **Análisis nodal IPR/VLP** (nodo de cabezal): nueva tarjeta que cruza el **aporte del pozo** (IPR por regresión pt–q sobre la ventana, misma pendiente que el gemelo) con la **demanda del sistema de descarga** (VLP por inversa de la fórmula de Bean + factor subcrítico, con `Cd` calibrado contra el punto operativo medido) — el punto de intersección es el **punto de operación natural**, acotado por la **ventana Turner–API RP 14E**. El copiloto responde «¿cuál es el punto de operación?».
+- **Copiloto ampliado a 17 intenciones**: + «¿Cómo va el replay del histórico?» (estado, exactitud, retardo, eventos) y la de nodal.
+- **E2E con Playwright**: suite de **11 tests** que cubren el journey completo contra el build de producción — landing (carga, revelado por scroll, imágenes, gate bloquea acceso directo, formulario y clave) y consola (entrenamiento sin congelar la UI, detección de falla inyectada, copiloto, replay etiquetado con matriz, Volve real, tarjeta nodal). Workflow `.github/workflows/e2e.yml` en CI con artefactos de fallo.
+- **Pruebas**: +33 tests unitarios (parser CSV: sinónimos, separadores, decimales coma, huecos, duplicados, epoch s/ms, clampeo; motor de replay: velocidades con reloj inyectado, acarreo fraccionario, seek, matriz de confusión, F1, retardo, eventos no detectados; nodal: inversa de Bean en régimen crítico y subcrítico, recuperación de pendiente IPR, punto de operación cerca del medido, ventana ordenada, rechazos honestos) — **173 en total**.
 
 ## Qué hay de nuevo en v0.11.0
 
@@ -236,5 +255,5 @@ Este proyecto busca validación de ingenieros de producción, analistas de opera
 ---
 
 <div align="center">
-<sub>VIGÍA ML v0.11.0 · Telemetría sintética con fines de demostración · Entrena, vigila, pregunta.</sub>
+<sub>VIGÍA ML v0.12.0 · Telemetría sintética + datos reales Volve (Equinor) · Entrena, vigila, pregunta.</sub>
 </div>

@@ -9,8 +9,8 @@
 //    por URL; incluye cross-origin opaque con cuidado).
 //  · Nunca intercepta POST ni peticiones de workflows de GitHub.
 // ---------------------------------------------------------------------------
-const VERSION = "vigia-ml-v0.6.0";
-const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.svg", "./icon-512.svg"];
+const VERSION = "vigia-ml-v0.12.0";
+const SHELL = ["./", "./index.html", "./app.html", "./manifest.webmanifest", "./icon-192.svg", "./icon-512.svg"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -45,11 +45,13 @@ self.addEventListener("fetch", (event) => {
       fetch(req)
         .then((res) => {
           const copy = res.clone();
-          caches.open(VERSION).then((c) => c.put("./index.html", copy)).catch(() => {});
+          caches.open(VERSION).then((c) => c.put(req, copy)).catch(() => {});
           return res;
         })
         .catch(() =>
-          caches.match("./index.html").then((hit) => hit || caches.match("./") || Response.error()),
+          caches
+            .match(req)
+            .then((hit) => hit || caches.match("./app.html") || caches.match("./index.html") || caches.match("./") || Response.error()),
         ),
     );
     return;

@@ -12,52 +12,36 @@ Historial de versiones y plan de la siguiente. Los títulos de cada versión tie
 | v0.9.0 | Soft-sensors | **Medición virtual** por choke (Bean + subcrítico), **RUL Weibull + AFT** |
 | v0.10.0 | Interacción | **Copiloto** en lenguaje natural 100 % local, tarjeta **EXPLAIN** |
 | v0.11.0 | Física operativa | **Asesor de setpoints** (Turner/API RP 14E), 4 regímenes nuevos, **gemelo digital** calibrado |
+| v0.12.0 | Piloto con datos reales | **Sitio público con gate** (landing brief + app), **replay CSV + matriz de confusión**, **datos reales Volve**, **análisis nodal IPR/VLP**, **E2E Playwright** |
 
-## v0.12.0 · «Piloto con datos reales» (propuesta)
+## v0.12.0 · «Piloto con datos reales» — ENTREGADO
 
-**Objetivo**: que un ingeniero de producción cargue sus propias series (histórico o SCADA en vivo), las vigile con los modelos ya entrenados, y reciba alertas accionables — con los datos quedando en su navegador salvo persistencia explícita.
+Todo el alcance propuesto quedó incluido y verificado (173 tests unitarios + 11 E2E):
+
+1. **Replay de histórico CSV** ✅ — parser flexible (separadores, fechas, sinónimos ES/EN), reproducción 1×–900×, base operativa re-derivada del histórico y matriz de confusión contra etiquetas con retardo por evento. Guía completa en `docs/REPLAY-CSV.md`.
+2. **Datos reales Volve (Equinor)** ✅ — pozos F-12 H (2008–2016) y F-11 H incluidos con mapeo documentado y atribución CC BY-NC-SA 4.0.
+3. **Persistencia opcional en Supabase** → se mantiene como candidata de v0.13 (fuera de alcance en v0.12; el replay cubre el caso «datos propios sin backend»).
+4. **Sitio público + gate** ✅ (añadido durante el desarrollo) — landing tipo brief con formulario/clave de acceso y la consola en `app.html`.
+
+## v0.13 · propuesta
+
+**Objetivo**: convertir el interés del gate en conversión medible y abrir ingesta en vivo sin backend propio.
 
 ### Alcance propuesto (4 características)
 
-1. **Replay de histórico CSV** — `#pilotaje`
-   - Cargar un CSV de telemetría real por pozo (columnas: `ts, pt, pc, pl, temp, q, choke`), mapearlo a la misma estructura del buffer y **reproducirlo a velocidad ajustable** (1×–600×).
-   - Durante el replay, el pipeline completo corre igual que en vivo: N1 pronostica, N2 puntúa anomalía, N3 diagnostica, RUL/setpoints responden.
-   - Si el CSV trae una columna opcional de **evento etiquetado** (p. ej. `event=liquid_loading`), la consola muestra la **matriz de confusión del modelo contra la realidad** — la killer feature para convencer a un escéptico: «tu histórico, tu modelo, esta habría sido la detección».
-   - Aceptación: CSV de 180 días × 5 pozos reproduce sin congelar la UI; métricas de detección contra etiquetas se calculan y muestran.
+1. **Supabase opcional** — tabla `samples` con RLS, credenciales solo en `localStorage`, ingesta por Edge Function desde el puente OPC-UA y lectura REST con cursor. Modo privado por defecto verificable (0 requests sin credenciales).
+2. **Alertas accionables** — motor sobre N4 (umbrales físicos), N2 (score sostenido) y N3 (cambio de diagnóstico dominante) con anti-rebote (hysteresis 15 min), Notification API opcional y bandeja con silencio por pozo/severidad.
+3. **Vigilancia de drift (PSI)** — comparación continua de la distribución de las 20 features del clasificador contra validación; semáforo verde/ámbar/rojo en el panel del motor con recomendación de reentrenar.
+4. **Export del modelo entrenado** — `LayersModel → IndexedDB + descarga` para reutilizar sin reentrenar, con sello de fecha/dataset.
 
-2. **Persistencia opcional en Supabase** — `#backend`
-   - Nuevo origen en «Fuente de datos»: **SUPABASE** (URL + anon key, credenciales solo en `localStorage`, nunca en el repo).
-   - Tabla `samples` con RLS; ingesta desde el puente OPC-UA por Edge Function; la consola lee por REST con paginación por cursor.
-   - Modo **privado por defecto**: sin credenciales configuradas, la app no hace ninguna llamada de red (verificable en la pestaña de red).
-   - Aceptación: dos navegadores ven el mismo stream en tiempo casi real; sin credenciales, cero requests externos.
+### Candidatas sin compromiso
 
-3. **Alertas accionables** — `#operacion`
-   - Motor de alertas sobre: cruce de umbral físico (N4), score de anomalía sostenido (N2) y cambio de diagnóstico dominante (N3), con anti-rebote (hysteresis 15 min).
-   - Entrega: **notificaciones del navegador** (Notification API, con permiso opcional) + panel de **bandeja de alertas** con silenciar por pozo/severidad y export del registro.
-   - Aceptación: inyección de régimen en el simulador dispara exactamente una alerta (no una ráfaga) y queda registrada con marca de tiempo.
-
-4. **Vigilancia de drift del modelo** — `#ml-ops`
-   - Comparación continua de la distribución de las 20 features del clasificador contra la del set de validación (**PSI** por feature y global).
-   - Semáforo visible en el panel del motor: verde (< 0,15), ámbar (0,15–0,3), rojo (> 0,3 → «los datos que ves no se parecen a los que el modelo conoció; considera reentrenar»).
-   - Aceptación: alimentar el pozo con base operativa fuera de rango enciende el ámbar/rojo; pozos normales se mantienen verdes.
-
-### Fuera de alcance (explícito) para v0.12.0
-
-- Entrenamiento federado o en servidor, login multiusuario (llega con Supabase Auth en v0.13), soporte móvil dedicado, i18n EN/ES de toda la UI (se evalúa tras el replay CSV), y más regímenes de falla (el catálogo de 9 se congela mientras no haya retroalimentación de campo).
-
-### Criterios de éxito de la versión
-
-- Un ingeniero sin ayuda puede: abrir la demo → cargar su CSV → ver la matriz de confusión contra sus eventos → decidir si el enfoque le sirve. Ese recorrido completo es el argumento de venta.
-- Los 140 tests siguen en verde y se añaden ≥ 25 nuevos (replay/parser CSV, anti-rebote de alertas, PSI, privacidad por defecto).
-
-## Candidatas para v0.13+ (sin compromiso)
-
-- **Supabase Auth + multioperador** (turnos, comentarios en eventos, auditoría de quién vio qué).
-- **i18n EN/ES** de toda la consola + copiloto bilingüe.
-- **Voz al copiloto** (Web Speech API, offline en Chrome) para manos ocupadas en sala de control.
-- **Curvas de declinación por flota** y EUR agregado del campo.
-- **Export del modelo entrenado** (LayersModel → IndexedDB + descarga) para reutilizarlo sin reentrenar.
-- **Modo aula**: inyectar dos regímenes superpuestos y explicar por qué el clasificador pondera cada uno.
+- Supabase Auth + multioperador (turnos, comentarios en eventos, auditoría).
+- i18n EN/ES de toda la consola + copiloto bilingüe.
+- Voz al copiloto (Web Speech API) para sala de control.
+- Curvas de declinación por flota y EUR agregado del campo.
+- Modo aula: dos regímenes superpuestos y por qué el clasificador pondera cada uno.
+- Modbus TCP y MQTT Sparkplug B como fuentes de ingesta adicionales.
 
 ## Principios que gobiernan el roadmap
 

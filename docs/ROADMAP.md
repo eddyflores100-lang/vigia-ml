@@ -22,6 +22,7 @@ Todo el alcance propuesto quedó incluido y verificado (173 tests unitarios + 11
 2. **Datos reales Volve (Equinor)** ✅ — pozos F-12 H (2008–2016) y F-11 H incluidos con mapeo documentado y atribución CC BY-NC-SA 4.0.
 3. **Persistencia opcional en Supabase** → se mantiene como candidata de v0.13 (fuera de alcance en v0.12; el replay cubre el caso «datos propios sin backend»).
 4. **Sitio público + gate** ✅ (añadido durante el desarrollo) — landing tipo brief con formulario/clave de acceso y la consola en `app.html`.
+5. **Puente OPC-UA validado de punta a punta** ✅ (endurecimiento posterior) — contra un servidor de simulación real (node-opcua): sesión perezosa + reconciliación de monitores desde el `subscribe` del cliente (bug de campo corregido: antes solo se monitoreaba el mapa del fichero), coalescencia de frames (500 ms), tolerancia a endpoints con hostname distinto (NAT/DNS), timeout de sesión acorde al intervalo y reconexión automática con supervivencia a caídas del SCADA. Herramientas incluidas: `bridge/sim-server.mjs` y `bridge/test-bridge.mjs` (smoke test de 3 comandos).
 
 ## v0.13 · propuesta
 

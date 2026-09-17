@@ -9,6 +9,15 @@ El navegador **no puede hablar el protocolo binario OPC-UA** (TCP 4840, codifica
 └──────────┘  :4840     └─────────────────┘             └────────────────────┘
 ```
 
+**Arquitectura interna (v0.12)**: sesión perezosa (se abre con el primer
+`subscribe` del cliente) + reconciliación de monitores (`applyMonitors`
+añade/retira según el mapa pedido) + coalescencia de frames (los cambios
+llegan uno por variable y se agrupan en un frame combinado por ventana de
+500 ms) + reconexión automática conservando el último mapa. Tolerante a
+endpoints anunciados con hostname distinto (`endpointMustExist: false`,
+habitual con NAT/alias DNS) y a intervalos de campo largos (timeout de
+sesión pedido explícitamente).
+
 ## Protocolo (frames JSON, una línea por mensaje)
 
 | Dirección | Frame | Significado |
@@ -68,6 +77,27 @@ de choke. El cliente descarta nodos fuera del mapa.
 ### Variables de entorno equivalentes
 
 `OPC_ENDPOINT`, `TAGMAP_FILE`, `WS_PORT`, `VIGIA_DEMO=1`.
+
+## Prueba de punta a punta sin SCADA (válido también como smoke test)
+
+El repo incluye un **servidor OPC-UA de simulación** (`sim-server.mjs`, con las
+6 variables del pozo actualizándose cada 2 s) y un **cliente WS de
+validación** (`test-bridge.mjs`). La prueba completa — arranque, suscripción,
+frames con los 6 NodeIds — se reduce a tres comandos:
+
+```bash
+cd bridge && npm install
+node sim-server.mjs &                          # SCADA simulado en opc.tcp://localhost:4840
+node opcua-bridge.mjs --endpoint opc.tcp://localhost:4840 --interval 5000 &
+node test-bridge.mjs                           # → RESULTADO: PASA ✓ (6/6 NodeIds)
+```
+
+`test-bridge.mjs` valida: conexión WS, `hello` del puente, `status ok`
+tras el `subscribe`, y al menos 3 frames de datos con los 6 NodeIds del
+mapa. **Prueba de resiliencia** (caída del SCADA): mata `sim-server`, espera
+la ventana `degraded`, revívelo y reconecta el cliente — el puente debe
+reportar `reconexión establecida` y volver a servir datos sin reiniciarse
+(validado en integración continua manual, 2026-09-17).
 
 ## Seguridad (léelo antes de producción)
 

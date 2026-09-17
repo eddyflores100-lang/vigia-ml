@@ -13,7 +13,7 @@ const STATS: Array<[string, string, string]> = [
   ["03", "MODELOS ML", "LSTM · autoencoder · clasificador"],
   ["09", "REGÍMENES DE FALLA", "de carga de líquidos a hidratos"],
   ["173", "TESTS AUTOMÁTICOS", "unitarios + E2E Playwright"],
-  ["00", "DATOS EN LA NUBE", "todo corre en tu navegador"],
+  ["0", "BYTES A LA NUBE", "tu información no sale del equipo"],
 ];
 
 const MARQUEE = [
@@ -226,7 +226,7 @@ function Hero() {
             <div key={label} className="bg-ink/70 backdrop-blur-sm px-5 py-4">
               <dt className="font-display font-bold text-3xl md:text-[34px] text-fg tabular-nums leading-none">
                 {n}
-                <span className="text-copper text-xl align-top ml-0.5">+</span>
+                {n !== "0" && <span className="text-copper text-xl align-top ml-0.5">+</span>}
               </dt>
               <dd className="mt-2">
                 <div className="font-mono text-[9.5px] tracking-[0.16em] text-fg2">{label}</div>

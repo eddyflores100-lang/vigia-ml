@@ -7,16 +7,19 @@ import { test, expect } from "@playwright/test";
 // ---------------------------------------------------------------------------
 
 test.describe("Landing público", () => {
-  test("carga con hero, stats y marquee", async ({ page }) => {
+  test("carga con portada, especificaciones, FIG. 01 y registro", async ({ page }) => {
     await page.goto("/");
-    await expect(page).toHaveTitle(/Anticipa la falla/);
-    await expect(page.getByRole("heading", { level: 1 })).toContainText("Anticipa la falla");
-    // stats strip visible
-    await expect(page.getByText("MODELOS ML")).toBeVisible();
-    // hero image renderizada
-    const hero = page.locator('img[src*="hero.jpg"]');
-    await expect(hero).toBeVisible();
-    expect(await hero.evaluate((i) => (i as HTMLImageElement).naturalWidth)).toBeGreaterThan(100);
+    await expect(page).toHaveTitle(/Laboratorio predictivo/);
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("VIGÍA");
+    // tabla de especificaciones visible
+    await expect(page.getByText("ESPECIFICACIONES DEL INSTRUMENTO")).toBeVisible();
+    await expect(page.getByText("184/184").first()).toBeVisible();
+    // el esquema técnico del pozo (FIG. 01) está presente y renderizado
+    await expect(page.getByText("FIG. 01").first()).toBeVisible();
+    const fig01 = page.locator("figure svg[role='img']").first();
+    await expect(fig01).toBeVisible();
+    // el registro continuo (papel de diagrama) carga
+    await expect(page.getByText("REG. Nº 01 — TENDENCIAS CONTINUAS")).toBeVisible();
   });
 
   test("las secciones se revelan al hacer scroll", async ({ page }) => {
@@ -25,10 +28,10 @@ test.describe("Landing público", () => {
       await page.locator(`#${id}`).scrollIntoViewIfNeeded();
       await page.waitForTimeout(900);
     }
-    // las tarjetas de capacidad ya no están en opacity 0
-    const card = page.locator(".cap-card").first();
-    await expect(card).toBeVisible();
-    const opacity = await card.evaluate((el) => getComputedStyle(el).opacity);
+    // las celdas de especificación ya no están en opacity 0
+    const cell = page.locator(".spec-cell").first();
+    await expect(cell).toBeVisible();
+    const opacity = await cell.evaluate((el) => getComputedStyle(el).opacity);
     expect(Number(opacity)).toBeGreaterThan(0.9);
   });
 
@@ -56,7 +59,7 @@ test.describe("Landing público", () => {
     await page.evaluate(() => localStorage.clear());
     await page.goto("/app.html");
     await page.waitForURL((u) => !u.pathname.includes("app.html"), { timeout: 15_000 });
-    await expect(page).toHaveTitle(/Anticipa la falla/);
+    await expect(page).toHaveTitle(/Laboratorio predictivo/);
   });
 
   test("formulario válido concede acceso y lleva a la consola", async ({ page }) => {

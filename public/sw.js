@@ -9,7 +9,7 @@
 //    por URL; incluye cross-origin opaque con cuidado).
 //  · Nunca intercepta POST ni peticiones de workflows de GitHub.
 // ---------------------------------------------------------------------------
-const VERSION = "vigia-ml-v0.12.0";
+const VERSION = "vigia-ml-v0.12.1";
 const SHELL = ["./", "./index.html", "./app.html", "./manifest.webmanifest", "./icon-192.svg", "./icon-512.svg"];
 
 self.addEventListener("install", (event) => {

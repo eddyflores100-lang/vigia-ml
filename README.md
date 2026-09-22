@@ -1,4 +1,4 @@
-> ⚠️ **PROYECTO MIGRADO** → continúa en **[alicelabs-llc/vigia-ml](https://github.com/alicelabs-llc/vigia-ml)** · Demo: https://alicelabs-llc.github.io/vigia-ml/
+> ⚠️ **PROYECTO MIGRADO** → continúa en **[alicelabs-llc/vigia-ml](https://github.com/alicelabs-llc/vigia-ml)** · Demo: https://vigia.alicelabs.site
 
 <div align="center">
 
@@ -20,7 +20,7 @@
 
 *Pronóstico LSTM · Detección de anomalías con autoencoder · Clasificación de fallas con red neuronal — todo entrena y ejecuta **en vivo** en tu navegador, sin servidor.*
 
-> ▶️ **Sitio público: [eddyflores100-lang.github.io/vigia-ml/](https://eddyflores100-lang.github.io/vigia-ml/)** — brief del producto con acceso a la consola vía **formulario o clave de demo** (`VIGIA-2026`). La consola vive en `/app.html`.
+> ▶️ **Sitio público: [vigia.alicelabs.site](https://vigia.alicelabs.site)** — brief del producto con acceso a la consola vía **formulario o clave de demo** (`VIGIA-2026`). La consola vive en `/app.html`.
 
 </div>
 
@@ -222,7 +222,7 @@ La app es 100% estática (todo el ML corre en el navegador), así que se desplie
 
 | Plataforma | Cómo | URL resultante |
 |------------|------|----------------|
-| **GitHub Pages** | Ya configurado: el workflow `.github/workflows/deploy.yml` publica en cada push a `main` | [eddyflores100-lang.github.io/vigia-ml](https://eddyflores100-lang.github.io/vigia-ml/) |
+| **GitHub Pages** | Ya configurado: el workflow `.github/workflows/deploy.yml` publica en cada push a `main`; dominio propio con HTTPS forzado | [vigia.alicelabs.site](https://vigia.alicelabs.site) |
 | **Vercel** | Importa el repo en [vercel.com/new](https://vercel.com/new) → framework **Vite** detectado automáticamente (config extra en `vercel.json`) | `vigia-ml.vercel.app` |
 | **Cloudflare Pages** | En [pages.cloudflare.com](https://pages.cloudflare.com) → *Connect to Git* → build `npm run build`, salida `dist` | `vigia-ml.pages.dev` |
 

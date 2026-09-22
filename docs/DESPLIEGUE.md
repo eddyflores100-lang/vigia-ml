@@ -2,7 +2,26 @@
 
 VIGÍA ML es una aplicación **100 % estática**: todo el cómputo (incluido el entrenamiento de los 3 modelos de TensorFlow.js) ocurre en el navegador del visitante. No hay backend, base de datos ni funciones serverless, así que puede alojarse gratis en cualquier hosting de sitios estáticos. Esta guía describe cómo migrar o replicar el despliegue actual de GitHub Pages en **Vercel** o **Cloudflare Pages**, manteniendo ambos activos si lo deseas (no son excluyentes: cada plataforma sirve el mismo `dist/` desde su propia URL).
 
-> **Estado actual**: GitHub Pages publica automáticamente en cada push a `main` mediante `.github/workflows/deploy.yml` → https://eddyflores100-lang.github.io/vigia-ml/
+> **Estado actual**: GitHub Pages publica automáticamente en cada push a `main` mediante `.github/workflows/deploy.yml` → **https://vigia.alicelabs.site** (dominio propio con HTTPS forzado; la URL `*.github.io` redirige aquí)
+
+## Dominio propio — vigia.alicelabs.site
+
+La web se sirve con dominio propio y HTTPS forzado; `https://eddyflores100-lang.github.io/vigia-ml/` redirige (301) a la URL canónica.
+
+| Pieza | Valor |
+|---|---|
+| URL canónica | **https://vigia.alicelabs.site** (consola en `/app.html`) |
+| Registro DNS (zona `alicelabs.site`, Hostinger) | `CNAME` · nombre `vigia` · apunta a `eddyflores100-lang.github.io` · TTL 14400 |
+| Custom domain | `vigia.alicelabs.site` en Settings → Pages del repo (vía API: `PUT /repos/{owner}/{repo}/pages` con `{"cname": "vigia.alicelabs.site"}`) |
+| HTTPS | Certificado emitido por GitHub al pasar el chequeo DNS; **Enforce HTTPS** activo (API: `{"https_enforced": true}`) |
+| Por qué funciona sin reconstruir | `vite.config.js` usa `base: "./"` → el mismo `dist/` sirve en la raíz del dominio y bajo `/vigia-ml/` (verificado con smoke test en ambas rutas) |
+
+Para mudar el dominio a otra cuenta u organización (p. ej. servir desde `alicelabs-llc/vigia-ml`):
+
+1. Vaciar el dominio del repo actual (Settings → Pages → Custom domain).
+2. Activar Pages en el repo destino (build vía Actions) y fijar el mismo custom domain.
+3. Cambiar el CNAME a `<cuenta>.github.io` (p. ej. `alicelabs-llc.github.io`).
+4. Esperar el chequeo DNS (GitHub reemite el certificado) y reactivar Enforce HTTPS.
 
 ## Por qué la migración es trivial
 

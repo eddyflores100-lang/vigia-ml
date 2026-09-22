@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// VIGÍA · figuras técnicas del landing «Cuaderno de laboratorio» (v0.12.1)
+// VIGÍA · figuras técnicas del landing «Cuaderno de laboratorio» (v0.12.2)
 // FIG. 01 — esquema del pozo vigilado: corte con revestidor, tubing, packer,
 //           perforaciones y los 6 transmisores que alimenta la consola.
 // REG. 01 — registro continuo en papel de diagrama: historia sólida,

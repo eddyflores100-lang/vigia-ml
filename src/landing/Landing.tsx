@@ -4,7 +4,9 @@ import { ACCESS_KEY } from "./gate";
 import { WellSchematic, StripChart, RegMark } from "./figures";
 
 // ---------------------------------------------------------------------------
-// VIGÍA · landing público — v0.12.1 «Cuaderno de laboratorio»
+// VIGÍA · landing público — v0.12.2 «Cuaderno de laboratorio»
+// v0.12.2 · colofón legal: AliceLabs LLC en el pie de página y documentos
+// legales estáticos en /legal/ (privacidad, términos de uso, marca).
 // El brief se presenta como un informe técnico de ingeniería: papel
 // milimetrado, secciones numeradas §01–§08, figuras (FIG.) y registros (REG.)
 // numerados, tablas regladas y sellos de tinta. Sin TensorFlow.js, sin
@@ -628,15 +630,18 @@ function Bitacora() {
 function Footer() {
   return (
     <footer className="border-t-2 border-ink mt-6">
-      <div className="mx-auto max-w-6xl px-5 md:px-8 py-10 grid gap-9 md:grid-cols-[1.5fr_1fr_1fr]">
+      <div className="mx-auto max-w-6xl px-5 md:px-8 py-10 grid gap-9 md:grid-cols-[1.5fr_1fr_1fr_1fr]">
         <div>
           <div className="flex items-center gap-2.5">
             <Crosshair size={20} />
-            <span className="font-display font-bold tracking-[0.16em] text-[17px]">VIGÍA ML</span>
+            <span className="font-display font-bold tracking-[0.16em] text-[17px]">VIGÍA ML™</span>
           </div>
           <p className="mt-3 text-ink2 text-[12.5px] leading-relaxed max-w-sm">
             Consola predictiva de pozos de gas con machine learning en el navegador. Proyecto de demostración
             educativa: no sustituye sistemas de control ni debe usarse para decisiones operativas críticas.
+          </p>
+          <p className="mt-4 pt-3 border-t border-line font-mono text-[9px] tracking-[0.16em] text-ink3 leading-relaxed">
+            UN PROYECTO DE <span className="text-red font-semibold">ALICELABS LLC</span> · WYOMING, USA
           </p>
         </div>
         <div>
@@ -655,11 +660,21 @@ function Footer() {
             <li>Licencia del código: AL-1.0</li>
           </ul>
         </div>
+        <div>
+          <div className="font-mono text-[9.5px] tracking-[0.2em] text-ink3 mb-3 border-b border-line pb-1.5">LEGAL</div>
+          <ul className="space-y-2 text-[13px]">
+            <li><a className="text-ink2 hover:text-red transition-colors" href="./legal/privacidad.html">Política de privacidad</a></li>
+            <li><a className="text-ink2 hover:text-red transition-colors" href="./legal/terminos.html">Términos de uso</a></li>
+            <li><a className="text-ink2 hover:text-red transition-colors" href="./legal/marca.html">Marca y avisos legales</a></li>
+            <li><a className="text-ink2 hover:text-red transition-colors" href="mailto:legal@alicelabs.site">legal@alicelabs.site</a></li>
+          </ul>
+        </div>
       </div>
       <div className="border-t border-ink">
         <div className="mx-auto max-w-6xl px-5 md:px-8 py-3.5 flex flex-wrap gap-x-6 gap-y-1.5 items-center font-mono text-[9px] tracking-[0.12em] text-ink3">
-          <span>DOC. VIG-012/26 · REV. C · 2026</span>
-          <span>VIGÍA ML v0.12.1</span>
+          <span>DOC. VIG-012/26 · REV. D · 2026</span>
+          <span>VIGÍA ML v0.12.2</span>
+          <span>© 2026 ALICELABS LLC · VIGÍA™ · TODOS LOS DERECHOS RESERVADOS</span>
           <span>TENSORFLOW.JS · REACT 18 · TYPESCRIPT</span>
           <span className="ml-auto">HECHO PARA INGENIEROS DE PRODUCCIÓN</span>
         </div>

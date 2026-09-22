@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f4f1e8" />
+    <title>Política de privacidad · VIGÍA ML</title>
+    <meta
+      name="description"
+      content="Política de privacidad de VIGÍA ML (AliceLabs LLC): la consola procesa todos los datos de pozos 100 % en el navegador, sin telemetría, sin cookies de rastreo y sin analítica. Documento VIG-LEG-01."
+    />
+    <meta name="robots" content="index, follow" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23f4f1e8'/%3E%3Ccircle cx='16' cy='16' r='10' fill='none' stroke='%231b1812' stroke-width='2'/%3E%3Cpath d='M16 1v30M1 16h30' stroke='%231b1812' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='3.4' fill='%23b23a26'/%3E%3C/svg%3E" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./legal.css" />
+  </head>
+  <body>
+    <div class="doc-wrap">
+      <header class="doc-head">
+        <div class="brand-row">
+          <span class="brand-mark" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 32 32">
+              <rect width="32" height="32" fill="#f4f1e8" />
+              <circle cx="16" cy="16" r="10" fill="none" stroke="#1b1812" stroke-width="2" />
+              <path d="M16 1v30M1 16h30" stroke="#1b1812" stroke-width="2" />
+              <circle cx="16" cy="16" r="3.4" fill="#b23a26" />
+            </svg>
+          </span>
+          <a class="brand-name" href="../">VIGÍA ML</a>
+          <span class="doc-ref">DOC. VIG-LEG-01 · REV. A</span>
+          <a class="back-link" href="../">← VOLVER AL LABORATORIO</a>
+        </div>
+        <h1>Política de privacidad</h1>
+        <p class="doc-meta">
+          VIGENTE DESDE EL 22 DE SEPTIEMBRE DE 2026 · APLICA A VIGÍA ML EN VIGIA.ALICELABS.SITE Y EN SU SITIO ESPEJO
+          DE GITHUB PAGES · RESPONSABLE: ALICELABS LLC, COMPAÑÍA DE RESPONSABILIDAD LIMITADA DE WYOMING, USA
+        </p>
+        <span class="stamp" aria-hidden="true">VIGENTE</span>
+      </header>
+
+      <main>
+        <section id="responsable">
+          <span class="sec-num">§01</span>
+          <div>
+            <h2><span class="sec-inline">§01</span>Responsable del tratamiento</h2>
+            <p>
+              VIGÍA ML (en adelante, «el sitio») es un proyecto de demostración tecnológica publicado y mantenido por
+              <strong>AliceLabs LLC</strong>, compañía de responsabilidad limitada constituida en el estado de
+              Wyoming, Estados Unidos. A los efectos de esta política, AliceLabs LLC es la responsable de decidir
+              qué datos trata el sitio y con qué finalidad, en los términos descritos en este documento.
+            </p>
+            <p>
+              El sitio se publica en el dominio <span class="k">vigia.alicelabs.site</span> y en su espejo de GitHub
+              Pages (<span class="k">eddyflores100-lang.github.io/vigia-ml</span>). Ambas publicaciones sirven
+              exactamente el mismo contenido estático y quedan cubiertas por esta política. Puedes contactar a
+              AliceLabs LLC en <a href="mailto:legal@alicelabs.site">legal@alicelabs.site</a> para cualquier asunto
+              de privacidad, y en <a href="mailto:info@alicelabs.site">info@alicelabs.site</a> para consultas
+              generales.
+            </p>
+          </div>
+        </section>
+
+        <section id="localidad">
+          <span class="sec-num">§02</span>
+          <div>
+            <h2><span class="sec-inline">§02</span>Principio de diseño: localidad por defecto</h2>
+            <p>
+              VIGÍA ML está diseñado bajo un principio único y verificable: <strong>los datos que cargues en la
+              consola se procesan íntegramente en tu navegador y nunca salen de tu equipo</strong>. El
+              entrenamiento de los modelos de aprendizaje automático (LSTM de pronóstico, autoencoder de anomalías
+              y clasificador de diagnóstico), la inferencia en tiempo real, el análisis nodal y la replay de
+              históricos se ejecutan en tu equipo mediante JavaScript y un Web Worker. No existe ningún servicio
+              de backend propio que reciba telemetría, series temporales, archivos CSV ni resultados de análisis.
+            </p>
+            <p>
+              Esta afirmación no es una promesa de marketing: es un hecho técnico comprobable. Al abrir la consola,
+              puedes abrir las herramientas de desarrollador del navegador (pestaña de <em>Red</em> /
+              <em>Network</em>) y verificar que la aplicación no emite peticiones externas con datos de operación.
+              Los únicos recursos que se solicitan por red son los estáticos del propio sitio (HTML, CSS,
+              JavaScript, imágenes, datasets de ejemplo y las tipografías descritas en §06).
+            </p>
+          </div>
+        </section>
+
+        <section id="no-recoge">
+          <span class="sec-num">§03</span>
+          <div>
+            <h2><span class="sec-inline">§03</span>Datos que VIGÍA no recoge</h2>
+            <p>El sitio <strong>no recoge, no almacena en servidores propios y no trata</strong> ninguna de las
+              siguientes categorías de información, porque técnicamente no existe ningún mecanismo para hacerlo:</p>
+            <ul>
+              <li><strong>Cuentas de usuario:</strong> no hay registro, inicio de sesión ni perfiles.</li>
+              <li><strong>Cookies de rastreo:</strong> el sitio no crea cookies propias ni de terceros, ni utiliza
+                píxeles de seguimiento, <em>fingerprinting</em> ni identificadores publicitarios.</li>
+              <li><strong>Analítica y métricas de uso:</strong> no se incluye Google Analytics ni ningún otro
+                servicio de medición. AliceLabs LLC no sabe quién visita el sitio, cuánto tiempo permanece ni
+                qué pantallas consulta.</li>
+              <li><strong>Datos de pozos ni de producción:</strong> cualquier CSV que importes, cualquier serie que
+                simules y cualquier modelo que entrenes viven en la memoria y el almacenamiento local de tu
+                navegador, bajo tu control exclusivo.</li>
+              <li><strong>Venta o cesión de datos:</strong> AliceLabs LLC no vende, alquila ni comparte dato
+                personal alguno, precisamente porque no los recoge.</li>
+            </ul>
+          </div>
+        </section>
+
+        <section id="local">
+          <span class="sec-num">§04</span>
+          <div>
+            <h2><span class="sec-inline">§04</span>Datos guardados en tu propio equipo</h2>
+            <p>
+              La única información con valor personal que existe en el proyecto se guarda en el
+              <strong>almacenamiento local (localStorage) de tu navegador</strong>, asociada al dominio del sitio y
+              sin ningún canal de transmisión hacia AliceLabs LLC. Son exactamente estas dos claves:
+            </p>
+            <table>
+              <thead>
+                <tr>
+                  <th>Clave</th>
+                  <th>Contenido</th>
+                  <th>Finalidad</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>vigia_access_v1</code></td>
+                  <td>Concesión de acceso a la consola: vía (formulario o clave de demo), nombre, correo,
+                    empresa y rol que escribiste, y la fecha de concesión.</td>
+                  <td>Recordar que ya concediste acceso, para no volver a pedirlo en cada visita.</td>
+                </tr>
+                <tr>
+                  <td><code>vigia_leads_v1</code></td>
+                  <td>Registro local de solicitudes de acceso (máximo 200 entradas, las más recientes).</td>
+                  <td>Bitácora local que el propio operador puede exportar; nunca se transmite.</td>
+                </tr>
+              </tbody>
+            </table>
+            <p>
+              El formulario de acceso del sitio se procesa <strong>íntegramente en tu navegador</strong>: al
+              enviarlo, la información no viaja a ningún servidor, se limita a habilitar la consola en tu equipo.
+              Si deseas eliminar estos datos, puedes usar la opción de tu navegador «borrar datos de sitios»
+              (cookies y datos de sitios web) para este dominio, o borrar el almacenamiento local desde las
+              herramientas de desarrollador. El borrado es inmediato y no requiere solicitud alguna, porque el
+              dato nunca salió de tu equipo.
+            </p>
+            <p class="nota">
+              VERIFICACIÓN EN 30 SEGUNDOS: HERRAMIENTAS DE DESARROLLADOR → APLICACIÓN → ALMACENAMIENTO LOCAL. AHÍ
+              ESTÁ TODO LO QUE EL SITIO SABE DE TI: DOS CLAVES, EN TU PROPIO EQUIPO.
+            </p>
+          </div>
+        </section>
+
+        <section id="hospedaje">
+          <span class="sec-num">§05</span>
+          <div>
+            <h2><span class="sec-inline">§05</span>Alojamiento y registros técnicos del proveedor</h2>
+            <p>
+              El sitio se sirve mediante <strong>GitHub Pages</strong>, un servicio de hospedaje de contenido
+              estático operado por GitHub, Inc. Como cualquier servidor web, GitHub Pages registra en sus
+              infraestructuras los accesos técnicos al contenido (dirección IP de solicitud, agente de usuario,
+              fecha y recurso solicitado) con fines de seguridad y operación del servicio. Esos registros
+              pertenecen a GitHub y se rigen por su propia
+              <a href="https://docs.github.com/en/site-policy/privacy-policies/github-privacy-statement" target="_blank" rel="noreferrer">Declaración de privacidad de GitHub ↗</a>.
+            </p>
+            <p>
+              AliceLabs LLC no tiene acceso a esos registros de servidor ni recibe informes de visitantes derivados
+              del hospedaje. Ninguna de esas bitácoras se asocia a perfiles de usuario en el sitio, porque el
+              sitio no crea perfiles.
+            </p>
+          </div>
+        </section>
+
+        <section id="fuentes">
+          <span class="sec-num">§06</span>
+          <div>
+            <h2><span class="sec-inline">§06</span>Tipografías cargadas de Google Fonts</h2>
+            <p>
+              El sitio emplea la familia tipográfica IBM Plex, servida por <strong>Google Fonts</strong>. En la
+              primera visita, tu navegador solicita las hojas de estilo y los archivos de fuente a los dominios
+              <span class="k">fonts.googleapis.com</span> y <span class="k">fonts.gstatic.com</span>. Como
+              consecuencia de esa petición, Google podría conocer tu dirección IP y ciertos datos técnicos de tu
+              navegador, bajo su propia
+              <a href="https://policies.google.com/privacy" target="_blank" rel="noreferrer">Política de privacidad ↗</a>.
+            </p>
+            <p>
+              A partir de la primera visita, el <em>service worker</em> del sitio cachea estos archivos y el sitio
+              funciona completamente <em>offline</em>, de modo que las visitas posteriores no generan nuevas
+              peticiones a Google. Si prefieres evitar esa primera petición, puedes bloquear los dominios de
+              terceros desde tu navegador o una extensión de bloqueo de contenido; el sitio seguirá siendo legible
+              con las tipografías de reserva del sistema.
+            </p>
+          </div>
+        </section>
+
+        <section id="terceros">
+          <span class="sec-num">§07</span>
+          <div>
+            <h2><span class="sec-inline">§07</span>Datos de terceros incluidos en el sitio</h2>
+            <p>
+              Para las demostraciones de replay, el sitio incluye extractos del dataset público
+              <strong>Volve</strong>, publicado por Equinor ASA bajo la licencia Creative Commons
+              BY-NC-SA 4.0 (atribución, no comercial, compartir igual). Son datos de producción ya públicos,
+              distribuidos como archivos estáticos junto con el sitio, sin relación contigo ni con datos de
+              cliente alguno. El resto de la telemetría que muestra la consola es sintética y declarada como tal
+              en la propia interfaz.
+            </p>
+          </div>
+        </section>
+
+        <section id="menores">
+          <span class="sec-num">§08</span>
+          <div>
+            <h2><span class="sec-inline">§08</span>Menores de edad</h2>
+            <p>
+              VIGÍA ML es una herramienta técnica dirigida a ingenieros y estudiantes de disciplinas de
+              ingeniería. El sitio no está dirigido a menores de 16 años y no recoge deliberadamente datos de
+              menores. Dado que no se recogen datos personales en servidor alguno, no existe tratamiento que
+              pudiera requerir consentimiento parental.
+            </p>
+          </div>
+        </section>
+
+        <section id="cambios">
+          <span class="sec-num">§09</span>
+          <div>
+            <h2><span class="sec-inline">§09</span>Cambios en esta política</h2>
+            <p>
+              AliceLabs LLC podrá actualizar esta política para reflejar mejoras del sitio o cambios normativos.
+              Toda revisión se publicará en esta misma URL con un nuevo número de revisión y una nueva fecha de
+              vigencia en la cabecera del documento. Si un cambio fuera sustancial y modificara el tratamiento de
+              datos personales, se destacará en la página principal del sitio antes de su entrada en vigor.
+            </p>
+          </div>
+        </section>
+
+        <section id="contacto">
+          <span class="sec-num">§10</span>
+          <div>
+            <h2><span class="sec-inline">§10</span>Contacto y ejercicio de derechos</h2>
+            <p>
+              Aunque el diseño local-first hace que prácticamente no exista tratamiento de datos personales por
+              parte de AliceLabs LLC, puedes ejercer cualquier consulta o derecho (acceso, rectificación,
+              supresión, oposición) escribiendo a
+              <a href="mailto:legal@alicelabs.site">legal@alicelabs.site</a>, indicando el sitio y el asunto. La
+              respuesta se dirigirá al correo de contacto que proporciones. Recuerda que los datos introducidos en
+              el formulario de acceso puedes suprimirlos tú mismo, de forma inmediata, borrando los datos de este
+              sitio en tu navegador.
+            </p>
+            <p>
+              AliceLabs LLC · Wyoming, USA · <a href="mailto:legal@alicelabs.site">legal@alicelabs.site</a> ·
+              <a href="mailto:info@alicelabs.site">info@alicelabs.site</a> ·
+              <a href="https://alicelabs.site" target="_blank" rel="noreferrer">alicelabs.site ↗</a>
+            </p>
+          </div>
+        </section>
+      </main>
+
+      <footer class="doc-foot">
+        <nav class="seealso" aria-label="Documentos legales">
+          <span>VER TAMBIÉN:</span>
+          <a href="./privacidad.html" aria-current="page">PRIVACIDAD</a>
+          <a href="./terminos.html">TÉRMINOS DE USO</a>
+          <a href="./marca.html">MARCA Y AVISOS</a>
+        </nav>
+        <p class="legal-line">
+          VIGÍA™ Y ALICELABS™ SON MARCAS DE ALICELABS LLC · © 2026 ALICELABS LLC · TODOS LOS DERECHOS RESERVADOS ·
+          WYOMING, USA · LEGAL@ALICELABS.SITE
+        </p>
+      </footer>
+    </div>
+  </body>
+</html>

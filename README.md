@@ -254,8 +254,18 @@ Este proyecto busca validación de ingenieros de producción, analistas de opera
 
 [AliceLabs Source-Available License v1.0 (AL-1.0)](LICENSE-AL-1.0) — el código es inspeccionable y ejecutable libremente para uso no comercial (aprendizaje, investigación académica, auditorías de seguridad). El uso comercial, la redistribución y los forks públicos requieren autorización escrita de AliceLabs LLC: `legal@alicelabs.site`.
 
+## Legal
+
+VIGÍA ML es un proyecto de **AliceLabs LLC** (Wyoming, USA). El sitio publica su marco legal como documentos estáticos:
+
+- [Política de privacidad](public/legal/privacidad.html) — procesamiento 100 % local, sin cookies de rastreo ni analítica (DOC. VIG-LEG-01).
+- [Términos y políticas de uso](public/legal/terminos.html) — naturaleza del proyecto, licencia AL-1.0 y limitación de responsabilidad (DOC. VIG-LEG-02).
+- [Marca y avisos legales](public/legal/marca.html) — VIGÍA™ y AliceLabs™ son marcas de AliceLabs LLC (DOC. VIG-LEG-03).
+
+Contacto legal: `legal@alicelabs.site` · Consultas generales: `info@alicelabs.site` · [alicelabs.site](https://alicelabs.site)
+
 ---
 
 <div align="center">
-<sub>VIGÍA ML v0.12.0 · Telemetría sintética + datos reales Volve (Equinor) · Entrena, vigila, pregunta.</sub>
+<sub>VIGÍA ML v0.12.2 · Telemetría sintética + datos reales Volve (Equinor) · Entrena, vigila, pregunta.</sub>
 </div>
